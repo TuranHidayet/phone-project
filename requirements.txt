@@ -1,0 +1,8 @@
+# Python asılılıqları
+# Quraşdırma:  pip3 install --user -r requirements.txt
+
+# Firefox bot (emulyasiya) üçün:
+playwright>=1.60
+
+# iPhone Safari bot (real cihaz) üçün:
+Appium-Python-Client>=5.3

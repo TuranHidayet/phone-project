@@ -1,0 +1,12 @@
+# loglar
+logs/*
+!logs/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
