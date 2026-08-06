@@ -63,10 +63,16 @@ def current_url(adb, serial):
     adb_sh(adb, serial, "shell", "uiautomator", "dump", "/sdcard/_ui.xml")
     xml = adb_sh(adb, serial, "shell", "cat", "/sdcard/_ui.xml")
     cands = re.findall(r'text="([^"]{4,120})"', xml)
+    # tam URL ve ya domen/yol
     for t in cands:
-        if "/" in t and "." in t and " " not in t:
+        if " " not in t and "/" in t and "." in t:
             return t
-    return cands[0] if cands else ""
+    # unvan setri cox vaxt yalniz domeni gosterir (mes. "kontakt.az")
+    for t in cands:
+        if " " not in t and re.match(r"^[\w-]+(\.[\w-]+)+$", t):
+            return t
+    # URL-e oxsar hec ne yoxdursa bos qaytar (bildiris metnini URL sanmayaq)
+    return ""
 
 
 def find_link_bands(png_path, skip_top_frac=0.28):
@@ -190,6 +196,123 @@ def close_bot_tab(adb, serial, pkg, tag):
     return True
 
 
+def _set_clear_checkboxes(adb, serial, xml):
+    """
+    "Delete browsing data" ekraninda YALNIZ tarixce+kuki+kes secili qalsin.
+    Tabs / Saved passwords / Autofill / Site settings secilidirse cixarilir --
+    istifadecinin oz melumatlari silinmesin.
+    """
+    want = {
+        "Browsing history": True,
+        "Cookies and site data": True,
+        "Cached images and files": True,
+        "Tabs": False,
+        "Saved passwords": False,
+        "Autofill form data": False,
+        "Site settings": False,
+    }
+    last_title = None
+    for chunk in xml.split("<node")[1:]:
+        m = re.search(r'text="([^"]*)"', chunk)
+        if 'resource-id="android:id/title"' in chunk and m:
+            last_title = m.group(1)
+        elif 'resource-id="android:id/checkbox"' in chunk and last_title in want:
+            checked = 'checked="true"' in chunk
+            if checked != want[last_title]:
+                b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
+                if b:
+                    x1, y1, x2, y2 = map(int, b.groups())
+                    human_tap(adb, serial, (x1 + x2) // 2, (y1 + y2) // 2)
+                    time.sleep(0.7)
+
+
+def clear_browsing_data(adb, serial, tag):
+    """
+    Botun izlerini silir: Menyu -> History -> Delete browsing data ->
+    All time -> Delete data. Yalniz tarixce, kuki ve kes gedir; istifadecinin
+    tablari, parollari, autofill-i toxunulmur. Novbeti isde Google terefinden
+    hec bir evvelki seans gorunmur.
+    """
+    log(tag, "Brauzer izleri temizlenir (tarixce+kuki+kes, All time)...")
+
+    # alt panel gizlidirse uze cixart
+    adb_sh(adb, serial, "shell", "input", "swipe", "360", "500", "360", "1100", "300")
+    time.sleep(1.2)
+
+    xml = ui_dump(adb, serial)
+    menu = node_center(xml, r'resource-id="[^"]*id/menu_button"')
+    if not menu:
+        log(tag, "   (menyu duymesi tapilmadi -- temizlik atlanir)")
+        return False
+    human_tap(adb, serial, *menu)
+    time.sleep(2.5)
+
+    xml = ui_dump(adb, serial)
+    hist = node_center(xml, r'text="(History|Tarix[^"]*)"')
+    if not hist:
+        log(tag, "   (History menyusu tapilmadi -- temizlik atlanir)")
+        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+        return False
+    human_tap(adb, serial, *hist)
+    time.sleep(3)
+
+    xml = ui_dump(adb, serial)
+    btn = node_center(xml, r'resource-id="[^"]*clear_browsing_data_button"')
+    if not btn:
+        log(tag, "   (Delete browsing data duymesi tapilmadi -- temizlik atlanir)")
+        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+        return False
+    human_tap(adb, serial, *btn)
+    time.sleep(3)
+
+    xml = ui_dump(adb, serial)
+    _set_clear_checkboxes(adb, serial, xml)
+
+    # Time range -> All time (siyahida sonuncu variant)
+    spinner = node_center(xml, r'resource-id="[^"]*id/spinner"')
+    if spinner:
+        human_tap(adb, serial, *spinner)
+        time.sleep(1.5)
+        xml2 = ui_dump(adb, serial)
+        opts = []
+        for chunk in xml2.split("<node")[1:]:
+            if 'resource-id="android:id/text1"' in chunk:
+                b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
+                if b:
+                    x1, y1, x2, y2 = map(int, b.groups())
+                    opts.append(((x1 + x2) // 2, (y1 + y2) // 2))
+        if len(opts) >= 2:
+            human_tap(adb, serial, *opts[-1])   # sonuncu = "All time"
+            time.sleep(1.5)
+        else:
+            adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1)
+
+    xml = ui_dump(adb, serial)
+    clear_btn = node_center(xml, r'resource-id="[^"]*id/clear_button"')
+    if not clear_btn:
+        log(tag, "   (Delete data duymesi tapilmadi -- temizlik atlanir)")
+        for _ in range(2):
+            adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1)
+        return False
+    human_tap(adb, serial, *clear_btn)
+    time.sleep(4)
+
+    # bezi hallarda tesdiq dialoqu cixir
+    xml = ui_dump(adb, serial)
+    conf = node_center(xml, r'resource-id="android:id/button1"')
+    if conf:
+        human_tap(adb, serial, *conf)
+        time.sleep(2)
+
+    # History sehifesinden tab-a geri qayit
+    adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+    time.sleep(1.5)
+    log(tag, "   izler temizlendi 🧹")
+    return True
+
+
 def main():
     p = argparse.ArgumentParser(description="Brave + Google axtaris botu (adb, chromedriver-siz)")
     p.add_argument("query", nargs="?", default="telefon", help="Axtaris sozu")
@@ -198,6 +321,8 @@ def main():
     p.add_argument("--stay", type=float, default=15, help="Acilan sehifede nece saniye qalsin")
     p.add_argument("--keep-tab", action="store_true",
                    help="Sonda tabi baglama (default: baglanir)")
+    p.add_argument("--keep-data", action="store_true",
+                   help="Sonda brauzer izlerini (tarixce/kuki/kes) silme (default: silinir)")
     p.add_argument("--shots", default=None,
                    help="Ekran sekillerini bu qovluqda SAXLA (default: saxlanmir, "
                         "muveqqeti fayl istifadeden sonra silinir)")
@@ -299,6 +424,8 @@ def main():
     else:
         shutil.rmtree(shots, ignore_errors=True)   # muveqqeti sekiller silinir
 
+    if not args.keep_data:
+        clear_browsing_data(adb, serial, tag)
     if not args.keep_tab:
         close_bot_tab(adb, serial, BRAVE_PKG, tag)
     log(tag, "Bitdi ✅")
