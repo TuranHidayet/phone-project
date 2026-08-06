@@ -36,8 +36,9 @@ import threading
 import subprocess
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+# QEYD: selenium YALNIZ chromedriver lazim olan funksiyalarda import olunur
+# (build_driver icinde). Bele olanda adb-only botlar (mes. brave_google_bot)
+# selenium qurulmadan da isleyir -- serverde asililiq azalir.
 
 # ------------------ AYARLAR ------------------
 CHROME_PKG        = "com.android.chrome"
@@ -150,6 +151,9 @@ def resolve_chromedriver(version):
 
 
 def build_driver(serial, driver_path):
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+
     opts = webdriver.ChromeOptions()
     opts.add_experimental_option("androidPackage", CHROME_PKG)
     opts.add_experimental_option("androidDeviceSerial", serial)
