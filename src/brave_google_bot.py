@@ -29,7 +29,9 @@ import re
 import sys
 import time
 import random
+import shutil
 import argparse
+import tempfile
 import subprocess
 from urllib.parse import quote_plus
 
@@ -132,7 +134,9 @@ def main():
     p.add_argument("--result", type=int, default=1, help="Necenci netice acilsin (default 1)")
     p.add_argument("--udid", help="Cihaz serial / IP:port")
     p.add_argument("--stay", type=float, default=15, help="Acilan sehifede nece saniye qalsin")
-    p.add_argument("--shots", default=None, help="Ekran sekillerini bu qovluqda saxla")
+    p.add_argument("--shots", default=None,
+                   help="Ekran sekillerini bu qovluqda SAXLA (default: saxlanmir, "
+                        "muveqqeti fayl istifadeden sonra silinir)")
     args = p.parse_args()
 
     adb = find_adb()
@@ -159,9 +163,13 @@ def main():
     prof = device_profile(adb, serial)
     tag = prof["model"] or serial
     size = prof["size"]
-    shots = args.shots or "/tmp"
-    os.makedirs(shots, exist_ok=True)
     print(f"=== {prof['model']} | Android {prof['android']} | {size[0]}x{size[1]} | Brave ===\n")
+
+    # --shots verilibse sekiller qalir; verilmeyibse muveqqeti qovluqda isleyib silinir
+    keep = args.shots is not None
+    shots = args.shots if keep else tempfile.mkdtemp(prefix="bravebot-")
+    if keep:
+        os.makedirs(shots, exist_ok=True)
 
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
 
@@ -176,17 +184,28 @@ def main():
         log(tag, "!! Ekran sekli alinmadi.")
         sys.exit(1)
 
+    def bail(code, *msgs):
+        """Xeta halinda: sekli tek bir yerde saxlayib (diaqnostika ucun) cixir."""
+        for m in msgs:
+            log(tag, m)
+        if not keep:
+            last = os.path.join(tempfile.gettempdir(), "bravebot-last.png")
+            try:
+                shutil.copy(shot, last)
+                log(tag, f"   Son ekran sekli: {last}")
+            except Exception:
+                pass
+            shutil.rmtree(shots, ignore_errors=True)
+        sys.exit(code)
+
     cur = current_url(adb, serial)
     if "/sorry" in cur or "recaptcha" in cur.lower():
-        log(tag, "!! Google bot yoxlamasi (CAPTCHA) cixdi -- dayanilir.")
-        log(tag, "   Bunu avtomatik kecmirik; brauzerin kukilerini temizlemek ve ya gozlemek lazimdir.")
-        sys.exit(2)
+        bail(2, "!! Google bot yoxlamasi (CAPTCHA) cixdi -- dayanilir.",
+             "   Bunu avtomatik kecmirik; brauzerin kukilerini temizlemek ve ya gozlemek lazimdir.")
 
     bands = find_link_bands(shot)
     if not bands:
-        log(tag, "!! Netice linki tapilmadi. Ekran sekli: " + shot)
-        log(tag, f"   Unvan setri: {cur}")
-        sys.exit(1)
+        bail(1, "!! Netice linki tapilmadi.", f"   Unvan setri: {cur}")
 
     log(tag, f"{len(bands)} netice basligi tapildi (yuxaridan asagi).")
     n = max(1, min(args.result, len(bands)))
@@ -206,12 +225,16 @@ def main():
         after = current_url(adb, serial)
 
     log(tag, f"AÇILDI: {after}")
-    screencap(adb, serial, os.path.join(shots, "opened.png"))
+    if keep:
+        screencap(adb, serial, os.path.join(shots, "opened.png"))
 
     touch_scroll(adb, serial, size, steps=random.randint(3, 6))
     time.sleep(args.stay)
-    screencap(adb, serial, os.path.join(shots, "after_scroll.png"))
-    log(tag, f"Ekran sekilleri: {shots}")
+    if keep:
+        screencap(adb, serial, os.path.join(shots, "after_scroll.png"))
+        log(tag, f"Ekran sekilleri: {shots}")
+    else:
+        shutil.rmtree(shots, ignore_errors=True)   # muveqqeti sekiller silinir
     log(tag, "Bitdi ✅")
 
 
