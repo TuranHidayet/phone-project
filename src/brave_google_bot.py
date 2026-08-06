@@ -67,9 +67,10 @@ def current_url(adb, serial):
     for t in cands:
         if " " not in t and "/" in t and "." in t:
             return t
-    # unvan setri cox vaxt yalniz domeni gosterir (mes. "kontakt.az")
+    # unvan setri cox vaxt yalniz domeni gosterir (mes. "kontakt.az");
+    # sonluq herf olmalidir ki, "399.99" kimi qiymetler domen sanilmasin
     for t in cands:
-        if " " not in t and re.match(r"^[\w-]+(\.[\w-]+)+$", t):
+        if " " not in t and re.match(r"^[\w-]+(\.[\w-]+)*\.[A-Za-z]{2,}$", t):
             return t
     # URL-e oxsar hec ne yoxdursa bos qaytar (bildiris metnini URL sanmayaq)
     return ""
