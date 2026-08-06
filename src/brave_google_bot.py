@@ -128,12 +128,76 @@ def human_tap(adb, serial, x, y):
     adb_sh(adb, serial, "shell", "input", "tap", str(int(x)), str(int(y)))
 
 
+def ui_dump(adb, serial):
+    adb_sh(adb, serial, "shell", "uiautomator", "dump", "/sdcard/_ui.xml")
+    return adb_sh(adb, serial, "shell", "cat", "/sdcard/_ui.xml")
+
+
+def node_center(xml, pattern):
+    """Verilen naxisa uygun ilk node-un merkez koordinatini qaytarir."""
+    for chunk in xml.split("<node")[1:]:
+        if re.search(pattern, chunk):
+            m = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
+            if m:
+                x1, y1, x2, y2 = map(int, m.groups())
+                return (x1 + x2) // 2, (y1 + y2) // 2
+    return None
+
+
+def open_url(adb, serial, pkg, url):
+    """
+    URL-i acir. application_id EXTRA-si sayesinde brauzer HER DEFE EYNI TABI
+    tekrar istifade edir -- her isde yeni tab acilib yigilmir.
+    """
+    adb_sh(adb, serial, "shell", "am", "start", "-a", "android.intent.action.VIEW",
+           "-d", url, "-p", pkg, "--activity-clear-top",
+           "--es", "com.android.browser.application_id", pkg)
+
+
+def close_bot_tab(adb, serial, pkg, tag):
+    """
+    Sonda botun tabini baglayir. Once sehife bosaldilir (about:blank) -- beleliklə
+    tab basligi "New tab" olur ve BIZIM tab oldugu birmenali bilinir; istifadecinin
+    oz tablarina toxunulmur.
+    """
+    open_url(adb, serial, pkg, "about:blank")
+    time.sleep(2.5)
+
+    # alt panel gizlidirse yuxari surusdurub uze cixart
+    adb_sh(adb, serial, "shell", "input", "swipe", "360", "500", "360", "1100", "300")
+    time.sleep(1.2)
+
+    xml = ui_dump(adb, serial)
+    sw = node_center(xml, r'resource-id="[^"]*tab_switcher_button"')
+    if not sw:
+        log(tag, "   (tab acari tapilmadi -- tab bos qaldi, yigilma olmayacaq)")
+        return False
+    human_tap(adb, serial, *sw)
+    time.sleep(2.5)
+
+    xml = ui_dump(adb, serial)
+    # yalniz BOS ("New tab" / "about:blank") tabin baglama duymesi
+    close_btn = node_center(xml, r'content-desc="Close (New tab|about:blank)[^"]*tab"')
+    if not close_btn:
+        log(tag, "   (bos tabin baglama duymesi tapilmadi -- tab bos qaldi)")
+        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+        return False
+
+    human_tap(adb, serial, *close_btn)
+    time.sleep(1.5)
+    log(tag, "   tab baglandi 🗙")
+    adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_HOME")
+    return True
+
+
 def main():
     p = argparse.ArgumentParser(description="Brave + Google axtaris botu (adb, chromedriver-siz)")
     p.add_argument("query", nargs="?", default="telefon", help="Axtaris sozu")
     p.add_argument("--result", type=int, default=1, help="Necenci netice acilsin (default 1)")
     p.add_argument("--udid", help="Cihaz serial / IP:port")
     p.add_argument("--stay", type=float, default=15, help="Acilan sehifede nece saniye qalsin")
+    p.add_argument("--keep-tab", action="store_true",
+                   help="Sonda tabi baglama (default: baglanir)")
     p.add_argument("--shots", default=None,
                    help="Ekran sekillerini bu qovluqda SAXLA (default: saxlanmir, "
                         "muveqqeti fayl istifadeden sonra silinir)")
@@ -175,8 +239,7 @@ def main():
 
     url = f"https://www.google.com/search?q={quote_plus(args.query)}"
     log(tag, f"Brave acilir, axtarilir: '{args.query}'")
-    adb_sh(adb, serial, "shell", "am", "start", "-a", "android.intent.action.VIEW",
-           "-d", url, "-p", BRAVE_PKG, "--activity-clear-top")
+    open_url(adb, serial, BRAVE_PKG, url)
     time.sleep(random.uniform(9, 12))
 
     shot = os.path.join(shots, "results.png")
@@ -235,6 +298,9 @@ def main():
         log(tag, f"Ekran sekilleri: {shots}")
     else:
         shutil.rmtree(shots, ignore_errors=True)   # muveqqeti sekiller silinir
+
+    if not args.keep_tab:
+        close_bot_tab(adb, serial, BRAVE_PKG, tag)
     log(tag, "Bitdi ✅")
 
 
