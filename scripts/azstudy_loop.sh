@@ -40,14 +40,25 @@ while true; do
     t0=$(date +%s)
     echo "=== $(date '+%F %T') | dovr #$n baslayir ==="
 
-    # Telefonu tap (IP deyisibse ozu axtarir)
-    SERIAL=$(scripts/find_phone.sh 2>/dev/null || true)
-    if [ -z "$SERIAL" ]; then
+    # Telefonlari tap (IP deyisibse ozu axtarir, sonradan qosulani da goturur)
+    SERIALS=$(scripts/find_phone.sh 2>/dev/null || true)
+    if [ -z "$SERIALS" ]; then
         echo "    telefon tapilmadi (sonduruludur / Wi-Fi-da deyil) -- bu dovr atlanir"
         rc=90
     else
-        $PY src/azstudy_bot.py --udid "$SERIAL"
-        rc=$?
+        n=$(echo "$SERIALS" | grep -c .)
+        echo "    $n telefon: $(echo $SERIALS | tr '\n' ' ')"
+        # Her telefon ucun bot PARALEL isleyir -- ardicil olsa 2 telefon
+        # dovr uzunluguna sigmazdi (bir is ~3 deq 30 san).
+        pids=""
+        for s in $SERIALS; do
+            $PY src/azstudy_bot.py --udid "$s" &
+            pids="$pids $!"
+        done
+        rc=0
+        for p in $pids; do
+            wait "$p" || rc=$?
+        done
     fi
     el=$(( $(date +%s) - t0 ))
     echo "=== $(date '+%F %T') | dovr #$n bitdi (kod=$rc, ${el} san) ==="
