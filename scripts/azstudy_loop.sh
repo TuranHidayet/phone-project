@@ -12,8 +12,7 @@ cd "$(dirname "$0")/.."
 source scripts/env.sh
 
 PIDFILE="logs/azstudy_loop.pid"
-CYCLE="${CYCLE:-240}"          # dovrun uzunlugu (saniye)
-PHONE_IP="${PHONE_IP:-192.168.1.127:5555}"
+CYCLE="${CYCLE:-300}"          # dovrun uzunlugu (saniye) -- bir is ~4 deq 40 san
 
 if [ "${1:-}" = "stop" ]; then
     if [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null; then
@@ -41,11 +40,15 @@ while true; do
     t0=$(date +%s)
     echo "=== $(date '+%F %T') | dovr #$n baslayir ==="
 
-    # Wi-Fi baglantisi dusubse yeniden qosulur
-    "$ANDROID_HOME/platform-tools/adb" connect "$PHONE_IP" >/dev/null 2>&1 || true
-
-    $PY src/azstudy_bot.py --udid "$PHONE_IP"
-    rc=$?
+    # Telefonu tap (IP deyisibse ozu axtarir)
+    SERIAL=$(scripts/find_phone.sh 2>/dev/null || true)
+    if [ -z "$SERIAL" ]; then
+        echo "    telefon tapilmadi (sonduruludur / Wi-Fi-da deyil) -- bu dovr atlanir"
+        rc=90
+    else
+        $PY src/azstudy_bot.py --udid "$SERIAL"
+        rc=$?
+    fi
     el=$(( $(date +%s) - t0 ))
     echo "=== $(date '+%F %T') | dovr #$n bitdi (kod=$rc, ${el} san) ==="
 

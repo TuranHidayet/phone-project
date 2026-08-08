@@ -59,9 +59,23 @@ def screencap(adb, serial, out_path):
 
 
 def current_url(adb, serial):
-    """Brave-in unvan setrini oxuyur (uiautomator brauzerin oz UI-ni gosterir)."""
-    adb_sh(adb, serial, "shell", "uiautomator", "dump", "/sdcard/_ui.xml")
-    xml = adb_sh(adb, serial, "shell", "cat", "/sdcard/_ui.xml")
+    """
+    Brave-in unvan setrini oxuyur.
+
+    ONCE unvan setrinin OZ node-u (url_bar) axtarilir: bu Brave build-inde
+    uiautomator veb mezmunu da gosterir, ona gore sadece "URL-e oxsayan ilk
+    metn"i goturmek sehv idi -- sehifedeki netice unvanlari (mes. netice
+    kartindaki "https://qebulol.az") unvan setri sanilir ve bot "sehv sehife
+    acildi" deyib bosuna geri qayidirdi.
+    """
+    xml = ui_dump(adb, serial)
+    for chunk in xml.split("<node")[1:]:
+        if 'resource-id="com.brave.browser:id/url_bar"' in chunk:
+            m = re.search(r'text="([^"]*)"', chunk)
+            if m and m.group(1).strip():
+                return m.group(1).strip()
+            break
+
     cands = re.findall(r'text="([^"]{4,120})"', xml)
     # tam URL ve ya domen/yol
     for t in cands:
@@ -136,8 +150,12 @@ def human_tap(adb, serial, x, y):
 
 
 def ui_dump(adb, serial):
-    adb_sh(adb, serial, "shell", "uiautomator", "dump", "/sdcard/_ui.xml")
-    return adb_sh(adb, serial, "shell", "cat", "/sdcard/_ui.xml")
+    """
+    UI agacini oxuyur. Dump ve cat BIR adb cagirisinda birlesdirilib --
+    iki ayri cagiris her defe ~1 san elave vaxt aparirdi (skriptde onlarla dump var).
+    """
+    return adb_sh(adb, serial, "shell",
+                  "uiautomator dump /sdcard/_ui.xml >/dev/null 2>&1; cat /sdcard/_ui.xml")
 
 
 def node_center(xml, pattern):
@@ -238,7 +256,7 @@ def clear_browsing_data(adb, serial, tag):
 
     # alt panel gizlidirse uze cixart
     adb_sh(adb, serial, "shell", "input", "swipe", "360", "500", "360", "1100", "300")
-    time.sleep(1.2)
+    time.sleep(0.9)
 
     xml = ui_dump(adb, serial)
     menu = node_center(xml, r'resource-id="[^"]*id/menu_button"')
@@ -246,7 +264,7 @@ def clear_browsing_data(adb, serial, tag):
         log(tag, "   (menyu duymesi tapilmadi -- temizlik atlanir)")
         return False
     human_tap(adb, serial, *menu)
-    time.sleep(2.5)
+    time.sleep(1.8)
 
     xml = ui_dump(adb, serial)
     hist = node_center(xml, r'text="(History|Tarix[^"]*)"')
@@ -255,7 +273,7 @@ def clear_browsing_data(adb, serial, tag):
         adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
         return False
     human_tap(adb, serial, *hist)
-    time.sleep(3)
+    time.sleep(2.2)
 
     xml = ui_dump(adb, serial)
     btn = node_center(xml, r'resource-id="[^"]*clear_browsing_data_button"')
@@ -264,7 +282,7 @@ def clear_browsing_data(adb, serial, tag):
         adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
         return False
     human_tap(adb, serial, *btn)
-    time.sleep(3)
+    time.sleep(2.2)
 
     xml = ui_dump(adb, serial)
     _set_clear_checkboxes(adb, serial, xml)
@@ -273,7 +291,7 @@ def clear_browsing_data(adb, serial, tag):
     spinner = node_center(xml, r'resource-id="[^"]*id/spinner"')
     if spinner:
         human_tap(adb, serial, *spinner)
-        time.sleep(1.5)
+        time.sleep(1.1)
         xml2 = ui_dump(adb, serial)
         opts = []
         for chunk in xml2.split("<node")[1:]:
@@ -284,13 +302,21 @@ def clear_browsing_data(adb, serial, tag):
                     opts.append(((x1 + x2) // 2, (y1 + y2) // 2))
         if len(opts) >= 2:
             human_tap(adb, serial, *opts[-1])   # sonuncu = "All time"
-            time.sleep(1.5)
+            time.sleep(1.1)
         else:
             adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
             time.sleep(1)
 
-    xml = ui_dump(adb, serial)
-    clear_btn = node_center(xml, r'resource-id="[^"]*id/clear_button"')
+    # "Delete data" duymesi bezen ekran hele qurulmadigi ucun tapilmir --
+    # bir nece defe yoxlanilir (metnle de: id deyisirse ehtiyat variant).
+    clear_btn = None
+    for _ in range(4):
+        xml = ui_dump(adb, serial)
+        clear_btn = (node_center(xml, r'resource-id="[^"]*id/clear_button"')
+                     or node_center(xml, r'text="(Delete data|Məlumatları sil)"'))
+        if clear_btn:
+            break
+        time.sleep(1.5)
     if not clear_btn:
         log(tag, "   (Delete data duymesi tapilmadi -- temizlik atlanir)")
         for _ in range(2):
@@ -298,18 +324,18 @@ def clear_browsing_data(adb, serial, tag):
             time.sleep(1)
         return False
     human_tap(adb, serial, *clear_btn)
-    time.sleep(4)
+    time.sleep(2.8)
 
     # bezi hallarda tesdiq dialoqu cixir
     xml = ui_dump(adb, serial)
     conf = node_center(xml, r'resource-id="android:id/button1"')
     if conf:
         human_tap(adb, serial, *conf)
-        time.sleep(2)
+        time.sleep(1.4)
 
     # History sehifesinden tab-a geri qayit
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
-    time.sleep(1.5)
+    time.sleep(1.1)
     log(tag, "   izler temizlendi 🧹")
     return True
 
