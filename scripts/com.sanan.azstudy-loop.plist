@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AzStudy botunu davamli isledir (her 5 deqiqede bir dovr).
+
+  launchd loop skriptini bir defe baslatir; dovrleri skriptin ozu sayir
+  (CYCLE saniye). KeepAlive: skript hansisa sebebden dayanarsa (ve ya
+  komputer yeniden acilarsa) launchd onu yeniden baslatir.
+
+  caffeinate -i: komputer bosdayken yatmasin, yoxsa dovrler dayanir.
+
+  Yuklemek:   launchctl load -w ~/Library/LaunchAgents/com.sanan.azstudy-loop.plist
+  Dayandirmaq: launchctl unload -w ~/Library/LaunchAgents/com.sanan.azstudy-loop.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sanan.azstudy-loop</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/caffeinate</string>
+        <string>-i</string>
+        <string>/Users/a1234/phone-project/scripts/azstudy_loop.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/a1234/phone-project</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CYCLE</key>
+        <string>300</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/a1234/phone-project/logs/azstudy_loop.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/a1234/phone-project/logs/azstudy_loop.log</string>
+</dict>
+</plist>
