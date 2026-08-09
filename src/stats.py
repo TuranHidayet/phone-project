@@ -119,6 +119,10 @@ def build_report(period="day", ref=None):
         key = r.get("serial") or "?"
         d = devs.setdefault(key, {"model": r.get("name") or r.get("model"),
                                   "ok": 0, "err": 0, "secs": 0.0, "errors": []})
+        # Kohne qeydlerde satis adi ("REDMI 15C") yoxdur, yalniz model kodu var.
+        # Hemin cihazin YENI qeydinde ad varsa, oxunakli adi gotururuk.
+        if r.get("name") and r["name"] != r.get("model"):
+            d["model"] = r["name"]
         if r.get("status") == "ok":
             d["ok"] += 1
             d["secs"] += r.get("secs") or 0
