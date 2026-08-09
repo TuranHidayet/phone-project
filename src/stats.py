@@ -91,6 +91,10 @@ def _period_bounds(period, ref=None):
         start = ref.replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + datetime.timedelta(days=1)
         title = f"Günlük hesabat — {start.date().isoformat()}"
+        # Hesabat gun bitmeden (mes. 23:00) gonderilirse, qalan saatin isleri
+        # bu hesabata dusmur -- bunu gizletmek yerine basliqda yazIriq.
+        if ref.hour < 23 or (ref.hour == 23 and ref.minute < 55):
+            title += f" (saat {ref.strftime('%H:%M')}-a qədər)"
     elif period == "month":
         # ayin 1-i sabah baslayirsa (gece hesabati) KECEN ay hesablanir
         first_this = ref.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
