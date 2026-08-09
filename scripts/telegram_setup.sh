@@ -26,7 +26,27 @@ fi
 
 printf "BotFather-dan aldigin TOKEN (ekranda gorunmeyecek): "
 stty -echo 2>/dev/null; read -r TOKEN; stty echo 2>/dev/null; echo
+TOKEN=$(printf '%s' "$TOKEN" | tr -d '[:space:]')
 [ -z "$TOKEN" ] && { echo "XETA: token bos."; exit 1; }
+
+# BotFather tokeni "123456789:AAH..." formatindadir -- sehv yapisdirmani
+# fayla yazmadan EVVEL tuturuq
+if ! printf '%s' "$TOKEN" | grep -qE '^[0-9]{6,}:[A-Za-z0-9_-]{30,}$'; then
+    echo "XETA: token formati duz gorunmur."
+    echo "      Gozlenilen: 123456789:AAH... (reqemler, iki noqta, uzun hisse)"
+    echo "      BotFather-dakı mesajdan TAM kopyala (bosluqsuz)."
+    exit 1
+fi
+
+echo "Token yoxlanilir..."
+ME=$(curl -s --max-time 15 "https://api.telegram.org/bot$TOKEN/getMe")
+if ! printf '%s' "$ME" | grep -q '"ok":true'; then
+    echo "XETA: Telegram tokeni qebul etmedi (yanlis ve ya legv edilmis)."
+    echo "      BotFather-da /mybots -> API Token ile yeniden yoxla."
+    exit 1
+fi
+BOTNAME=$(printf '%s' "$ME" | sed -n 's/.*"username":"\([^"]*\)".*/\1/p')
+echo "Bot tapildi: @$BOTNAME"
 
 echo "chat_id axtarilir (botuna yazdigin mesaj oxunur)..."
 CHAT=$(curl -s --max-time 15 "https://api.telegram.org/bot$TOKEN/getUpdates" \
@@ -34,9 +54,9 @@ CHAT=$(curl -s --max-time 15 "https://api.telegram.org/bot$TOKEN/getUpdates" \
 
 if [ -z "$CHAT" ]; then
     echo
-    echo "chat_id tapilmadi. Sebeb: hele botuna mesaj yazmamisan."
-    echo "Telegram-da botunu ac, ona /start ve ya istenilen mesaj yaz, sonra"
-    echo "bu skripti tekrar ise sal."
+    echo "chat_id tapilmadi -- bu, hele bota mesaj yazmadigin demekdir."
+    echo "Telegram-da @$BOTNAME botunu ac, ona /start yaz, sonra bu skripti"
+    echo "tekrar ise sal. (Token duzdur, sadece mesaj lazimdir.)"
     exit 1
 fi
 
