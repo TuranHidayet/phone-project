@@ -113,12 +113,22 @@ def device_profile(adb, serial):
     """Cihaz haqqinda lazim olan her sey: model, android, ekran, Chrome versiyasi."""
     model = adb_sh(adb, serial, "shell", "getprop", "ro.product.model") or serial
     android = adb_sh(adb, serial, "shell", "getprop", "ro.build.version.release")
+    brand = adb_sh(adb, serial, "shell", "getprop", "ro.product.brand")
+    # Model kodu insan ucun oxunaqli deyil ("25078RA3EY"); telefonlarin
+    # coxunda satis adi ayrica propertyde olur ("REDMI 15C").
+    market = (adb_sh(adb, serial, "shell", "getprop", "ro.product.marketname")
+              or adb_sh(adb, serial, "shell", "getprop", "ro.config.marketing_name")
+              or adb_sh(adb, serial, "shell", "getprop", "ro.product.vendor.marketname"))
+    if market and market.lower() != model.lower():
+        name = f"{brand} {market}".strip() if brand and not market.lower().startswith(brand.lower()) else market
+    else:
+        name = f"{brand} {model}".strip() if brand else model
     m = re.search(r"(\d+)x(\d+)", adb_sh(adb, serial, "shell", "wm", "size"))
     size = (int(m.group(1)), int(m.group(2))) if m else (1080, 1920)
     dump = adb_sh(adb, serial, "shell", "dumpsys", "package", CHROME_PKG)
     cm = re.search(r"versionName=([\d.]+)", dump)
-    return {"serial": serial, "model": model, "android": android,
-            "size": size, "chrome": cm.group(1) if cm else None}
+    return {"serial": serial, "model": model, "name": name, "brand": brand,
+            "android": android, "size": size, "chrome": cm.group(1) if cm else None}
 
 
 def make_tags(profiles):

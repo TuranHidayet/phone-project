@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Gunluk hesabat: her aksam saat 23:00-da Telegram-a gonderilir.
+  (Komputer hemin saatda yatmisdirsa launchd oyananda derhal isledir.)
+
+  Yuklemek: launchctl load -w ~/Library/LaunchAgents/com.sanan.azstudy-report-daily.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sanan.azstudy-report-daily</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/a1234/phone-project/src/stats.py</string>
+        <string>report</string>
+        <string>--period</string>
+        <string>day</string>
+        <string>--send</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/a1234/phone-project</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>23</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/a1234/phone-project/logs/report.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/a1234/phone-project/logs/report.log</string>
+</dict>
+</plist>

@@ -30,6 +30,8 @@
     <dict>
         <key>CYCLE</key>
         <string>300</string>
+        <key>PHONES</key>
+        <string>2</string>
     </dict>
 
     <key>RunAtLoad</key>

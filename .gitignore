@@ -10,3 +10,7 @@ venv/
 
 # OS
 .DS_Store
+
+# Telegram konfiqi ev qovlugunda saxlanir (~/.config/azstudy/telegram.env),
+# repoda hec bir token olmamalidir
+*.env

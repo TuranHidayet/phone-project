@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Ayliq hesabat: her ayin 1-i saat 00:30-da KECEN ay ucun gonderilir.
+  (Komputer hemin saatda yatmisdirsa launchd oyananda derhal isledir.)
+
+  Yuklemek: launchctl load -w ~/Library/LaunchAgents/com.sanan.azstudy-report-monthly.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sanan.azstudy-report-monthly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/a1234/phone-project/src/stats.py</string>
+        <string>report</string>
+        <string>--period</string>
+        <string>month</string>
+        <string>--send</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/a1234/phone-project</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Day</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>0</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/a1234/phone-project/logs/report.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/a1234/phone-project/logs/report.log</string>
+</dict>
+</plist>

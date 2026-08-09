@@ -38,6 +38,8 @@ from brave_google_bot import (
     BRAVE_PKG, screencap, current_url, ui_dump, node_center, human_tap,
     open_url, close_bot_tab, clear_browsing_data,
 )
+import stats
+import notify
 
 # Neticelerde axtarilan soz. "azstudy" YOX, "azstudy.az" -- cunki qisa variant
 # video karuselindeki "AzStudy" kanal etiketine de dusur ve toxunus sehv karta gedir.
@@ -456,10 +458,19 @@ def main():
 
     shots = tempfile.mkdtemp(prefix="azstudybot-")
     shot = os.path.join(shots, "fip.png")
+    t_start = time.time()
 
     def bail(code, *msgs):
         for m in msgs:
             log(tag, m)
+        # Xeta qeyde alinir ve Telegram-a bildiris gedir (qurasdirilibsa).
+        # Bildiris gonderilmese de bot normal sekilde dayanir.
+        err = msgs[0].lstrip("! ").strip() if msgs else "namelum xeta"
+        stats.record(serial, prof["model"], prof["android"], args.query,
+                     "error", time.time() - t_start, error=err,
+                     name=prof.get("name"))
+        notify.send(f"❌ <b>{prof.get('name') or prof['model']}</b>\n"
+                    f"Bot xəta ilə dayandı:\n{err}")
         last = os.path.join(tempfile.gettempdir(), "azstudybot-last.png")
         try:
             shutil.copy(shot, last)
@@ -547,7 +558,17 @@ def main():
         clear_browsing_data(adb, serial, tag)
     if not args.keep_tab:
         close_bot_tab(adb, serial, BRAVE_PKG, tag)
-    log(tag, "Bitdi ✅")
+
+    secs = time.time() - t_start
+    stats.record(serial, prof["model"], prof["android"], args.query,
+                 "ok", secs, url=after, name=prof.get("name"))
+    # Her ugurlu is ucun bildiris SUSMAYA gore gonderilmir (gunde ~280 mesaj
+    # olardi); yalniz NOTIFY_EACH_RUN=1 verilibse gonderilir. Xetalar ve
+    # gunluk hesabat her halda gedir.
+    if os.environ.get("NOTIFY_EACH_RUN") == "1":
+        notify.send(f"✅ <b>{prof.get('name') or prof['model']}</b>\n"
+                    f"{after or 'azstudy.az'} — {secs:.0f} san", silent=True)
+    log(tag, f"Bitdi ✅ ({secs:.0f} san)")
 
 
 if __name__ == "__main__":

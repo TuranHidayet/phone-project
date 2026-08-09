@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# AzStudy botunu 4 deqiqelik DOVRLE isledir:
-#   - bot islenir (adeten ~3 deq 20 san)
+# AzStudy botunu DOVRLE isledir (default 5 deqiqe):
+#   - qosulu HER telefon ucun bot paralel islenir (bir is ~3 deq 30 san)
 #   - dovrun qalan vaxti gozlenilir (bufer)
-#   - 4 deqiqe tamamlananda yeni dovr baslayir
-#   - bot 4 deqiqeden UZUN cekerse, bitdiyi anda derhal yeni dovr baslayir
+#   - dovr uzunlugu tamamlananda yeni dovr baslayir
+#   - is CYCLE-den UZUN cekerse, bitdiyi anda derhal yeni dovr baslayir
+#
+# Telegram bildirisleri (qurasdirilibsa -- scripts/telegram_setup.sh):
+#   loop basladi / dayandi, telefon itdi / qayitdi, ust-uste xetalar.
+#   Her ugurlu is ucun mesaj GONDERILMIR (gunde ~300 mesaj olardi);
+#   gunluk hesabat ayrica agentle saat 23:00-da gedir.
 #
 # Baslatmaq:  nohup scripts/azstudy_loop.sh >> logs/azstudy_loop.log 2>&1 &
 # Dayandirmaq: scripts/azstudy_loop.sh stop
@@ -12,7 +17,11 @@ cd "$(dirname "$0")/.."
 source scripts/env.sh
 
 PIDFILE="logs/azstudy_loop.pid"
-CYCLE="${CYCLE:-300}"          # dovrun uzunlugu (saniye) -- bir is ~4 deq 40 san
+CYCLE="${CYCLE:-300}"          # dovrun uzunlugu (saniye)
+
+tg () {  # Telegram-a mesaj (qurasdirilmayibsa sessiz kecir)
+    $PY src/notify.py "$1" >/dev/null 2>&1 || true
+}
 
 if [ "${1:-}" = "stop" ]; then
     if [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null; then
@@ -31,10 +40,24 @@ if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
     exit 1
 fi
 echo $$ > "$PIDFILE"
-trap 'rm -f "$PIDFILE"' EXIT
+
+# Loop hansisa sebebden dayanarsa (kill, xeta, komputer sondurulmesi)
+# Telegram-a xeber gedir. launchd onu yeniden baslatdiqda "basladi" mesaji gelir.
+on_exit () {
+    rm -f "$PIDFILE"
+    tg "🛑 <b>AzStudy loop dayandı</b>
+Son dövr: #${n:-0}. Yenidən başlamazsa yoxla:
+launchctl list | grep azstudy"
+}
+trap on_exit EXIT
 
 mkdir -p logs
+tg "🔄 <b>AzStudy loop başladı</b>
+Dövr: hər $((CYCLE / 60)) dəqiqə"
+
 n=0
+fails=0
+phones_missing=0
 while true; do
     n=$((n + 1))
     t0=$(date +%s)
@@ -45,11 +68,24 @@ while true; do
     if [ -z "$SERIALS" ]; then
         echo "    telefon tapilmadi (sonduruludur / Wi-Fi-da deyil) -- bu dovr atlanir"
         rc=90
+        # Bildiris yalniz VEZIYYET DEYISENDE gedir (her dovrde spam olmasin)
+        if [ "$phones_missing" -eq 0 ]; then
+            tg "⚠️ <b>Telefon tapılmadı</b>
+Cihaz söndürülüb, Wi-Fi-dan düşüb və ya batareya bitib.
+Dövrlər telefon qayıdana qədər atlanacaq."
+        fi
+        phones_missing=$((phones_missing + 1))
     else
-        n=$(echo "$SERIALS" | grep -c .)
-        echo "    $n telefon: $(echo $SERIALS | tr '\n' ' ')"
+        cnt=$(echo "$SERIALS" | grep -c .)
+        echo "    $cnt telefon: $(echo $SERIALS | tr '\n' ' ')"
+        if [ "$phones_missing" -gt 0 ]; then
+            tg "✅ <b>Telefon qayıtdı</b>
+$cnt cihaz qoşuludur, dövrlər davam edir ($phones_missing dövr atlanmışdı)."
+            phones_missing=0
+        fi
+
         # Her telefon ucun bot PARALEL isleyir -- ardicil olsa 2 telefon
-        # dovr uzunluguna sigmazdi (bir is ~3 deq 30 san).
+        # dovr uzunluguna sigmazdi.
         pids=""
         for s in $SERIALS; do
             $PY src/azstudy_bot.py --udid "$s" &
@@ -59,6 +95,23 @@ while true; do
         for p in $pids; do
             wait "$p" || rc=$?
         done
+
+        # Ust-uste xetalar: her xeta ucun bot ozu mesaj gonderir, burada ise
+        # yalniz DAVAMLI problem halinda (3 dovr ardicil) xeberdarliq edirik.
+        if [ "$rc" -ne 0 ]; then
+            fails=$((fails + 1))
+            if [ "$fails" -eq 3 ]; then
+                tg "🔁 <b>Ardıcıl 3 dövr xəta ilə bitdi</b>
+Problem davam edir — loglara bax:
+logs/azstudy_loop.log"
+            fi
+        else
+            if [ "$fails" -ge 3 ]; then
+                tg "✅ <b>Bərpa olundu</b>
+$fails uğursuz dövrdən sonra bot yenidən normal işləyir."
+            fi
+            fails=0
+        fi
     fi
     el=$(( $(date +%s) - t0 ))
     echo "=== $(date '+%F %T') | dovr #$n bitdi (kod=$rc, ${el} san) ==="
