@@ -25,6 +25,28 @@ import datetime
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUNS_FILE = os.path.join(BASE, "logs", "runs.jsonl")
+# Sonuncu gunluk hesabatin bitis ani -- novbeti hesabat MEHZ oradan baslayir
+STATE_FILE = os.path.join(BASE, "logs", "report_state.json")
+
+
+def _read_state():
+    try:
+        with open(STATE_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _write_state(key, ts):
+    try:
+        st = _read_state()
+        st[key] = ts
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        with open(STATE_FILE, "w") as f:
+            json.dump(st, f)
+        return True
+    except Exception:
+        return False
 
 # Model kodlarini oxunakli ada cevirmek ucun (telefon elave olunduqca genislenir)
 # Cihazin satis adi ("REDMI 15C") telefonun ozunden oxunur (device_profile),
@@ -88,13 +110,20 @@ def _period_bounds(period, ref=None):
     """(baslangic_ts, bitis_ts, basliq) qaytarir."""
     ref = ref or datetime.datetime.now()
     if period == "day":
-        start = ref.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = start + datetime.timedelta(days=1)
-        title = f"Günlük hesabat — {start.date().isoformat()}"
-        # Hesabat gun bitmeden (mes. 23:00) gonderilirse, qalan saatin isleri
-        # bu hesabata dusmur -- bunu gizletmek yerine basliqda yazIriq.
-        if ref.hour < 23 or (ref.hour == 23 and ref.minute < 55):
-            title += f" (saat {ref.strftime('%H:%M')}-a qədər)"
+        # DIQQET: teqvim gunu (00:00-24:00) DEYIL.
+        # Hesabat saat 23:00-da gedirse, teqvim gunu ile hesablayanda
+        # 23:00-24:00 arasindaki isler (~12 ed.) hec bir hesabata dusmurdu.
+        # Ona gore pencere SONUNCU HESABATDAN indiye qederdir: 23:00 -> 23:00.
+        # Komputer yatib hesabat gecikse bele bosluq qalmir -- gecikmis
+        # muddet novbeti hesabata butovlukde daxil olur.
+        end = ref
+        last = _read_state().get("day")
+        if last and last < end.timestamp():
+            start = datetime.datetime.fromtimestamp(last)
+        else:
+            start = end - datetime.timedelta(hours=24)
+        title = (f"Günlük hesabat — {start.strftime('%d.%m %H:%M')}"
+                 f" → {end.strftime('%d.%m %H:%M')}")
     elif period == "month":
         # ayin 1-i sabah baslayirsa (gece hesabati) KECEN ay hesablanir
         first_this = ref.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -173,16 +202,20 @@ def main():
 
     args = p.parse_args()
     if args.cmd == "report":
-        text = build_report(args.period)
+        now = datetime.datetime.now()
+        text = build_report(args.period, ref=now)
         if args.send:
             import sys
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             import notify
             ok = notify.send(text)
             print("gonderildi" if ok else "GONDERILMEDI (Telegram qurasdirilmayib?)")
-            print(text.replace("<b>", "").replace("</b>", ""))
-        else:
-            print(text.replace("<b>", "").replace("</b>", ""))
+            # Pencerenin bitisi YALNIZ ugurlu gonderisde yadda saxlanir --
+            # mesaj catmayibsa hemin muddet novbeti hesabatda tekrar gelsin,
+            # itmesin.
+            if ok and args.period == "day":
+                _write_state("day", now.timestamp())
+        print(text.replace("<b>", "").replace("</b>", ""))
 
 
 if __name__ == "__main__":
