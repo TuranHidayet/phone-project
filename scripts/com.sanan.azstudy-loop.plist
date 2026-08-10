@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  AzStudy botunu davamli isledir (her 5 deqiqede bir dovr).
+  AzStudy botunu davamli isledir (her 4 deqiqede bir dovr).
 
   launchd loop skriptini bir defe baslatir; dovrleri skriptin ozu sayir
   (CYCLE saniye). KeepAlive: skript hansisa sebebden dayanarsa (ve ya
@@ -29,7 +29,7 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>CYCLE</key>
-        <string>300</string>
+        <string>240</string>
         <key>PHONES</key>
         <string>2</string>
     </dict>

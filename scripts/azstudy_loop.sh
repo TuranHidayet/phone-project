@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AzStudy botunu DOVRLE isledir (default 5 deqiqe):
+# AzStudy botunu DOVRLE isledir (default 4 deqiqe):
 #   - qosulu HER telefon ucun bot paralel islenir (bir is ~3 deq 30 san)
 #   - dovrun qalan vaxti gozlenilir (bufer)
 #   - dovr uzunlugu tamamlananda yeni dovr baslayir
@@ -7,7 +7,7 @@
 #
 # Telegram bildirisleri (qurasdirilibsa -- scripts/telegram_setup.sh):
 #   loop basladi / dayandi, telefon itdi / qayitdi, ust-uste xetalar.
-#   Her ugurlu is ucun mesaj GONDERILMIR (gunde ~300 mesaj olardi);
+#   Her ugurlu is ucun mesaj GONDERILMIR (gunde ~360 mesaj olardi);
 #   gunluk hesabat ayrica agentle saat 23:00-da gedir.
 #
 # Baslatmaq:  nohup scripts/azstudy_loop.sh >> logs/azstudy_loop.log 2>&1 &
@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 source scripts/env.sh
 
 PIDFILE="logs/azstudy_loop.pid"
-CYCLE="${CYCLE:-300}"          # dovrun uzunlugu (saniye)
+CYCLE="${CYCLE:-240}"          # dovrun uzunlugu (saniye) -- bir dovr median 215 san
 
 tg () {  # Telegram-a mesaj (qurasdirilmayibsa sessiz kecir)
     $PY src/notify.py "$1" >/dev/null 2>&1 || true
