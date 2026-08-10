@@ -24,6 +24,12 @@ mkdir -p logs
 ready_serials () {
     "$ADB" devices | awk '$2=="device" {print $1}'
 }
+
+# Telefon Wi-Fi-dan dusende adb-de "offline" kimi ilisib qalir ve hemin
+# kohne qeyd yeniden qosulmaga mane olur -- once onlari atiriq.
+"$ADB" devices | awk '$2!="device" && $1 ~ /:/ {print $1}' | while read -r dead; do
+    [ -n "$dead" ] && "$ADB" disconnect "$dead" >/dev/null 2>&1
+done
 ready_count () {
     ready_serials | grep -c . || true
 }
