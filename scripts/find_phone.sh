@@ -22,7 +22,26 @@ WANT="${PHONES:-1}"
 mkdir -p logs
 
 ready_serials () {
-    "$ADB" devices | awk '$2=="device" {print $1}'
+    # BIR CIHAZ BIR NECE ADLA gorune biler: IP:5555, IP:43997 (simsiz sazlama
+    # portu) ve mDNS adi (adb-1023...._adb-tls-connect._tcp) -- hepsi eyni
+    # telefondur. Deduplikasiya EDILMESE loop eyni telefonda 2-3 bot paralel
+    # isledir ve onlar bir-birinin isini pozur.
+    # Ona gore cihazin APARAT SERIALI (ro.serialno) ile teklesdirilir.
+    # QEYD: `adb shell`-e `< /dev/null` VACIBDIR -- yoxsa o, dovrun stdin-ini
+    # udur ve siyahi birinci cihazdan sonra kesilir.
+    "$ADB" devices | awk '$2=="device" {print $1}' | while read -r s; do
+        [ -n "$s" ] || continue
+        hw=$("$ADB" -s "$s" shell getprop ro.serialno < /dev/null 2>/dev/null | tr -d '\r\n')
+        [ -z "$hw" ] && hw="$s"
+        # Ustunluk: sabit :5555 (yeniden baslatmadan sonra da eyni qalir) >
+        # tesadufi simsiz-sazlama portu > mDNS adi
+        case "$s" in
+            *:5555) prio=0 ;;
+            *:*)    prio=1 ;;
+            *)      prio=2 ;;
+        esac
+        printf '%s\t%s\t%s\n' "$hw" "$prio" "$s"
+    done | sort -k1,1 -k2,2n | awk -F'\t' '!seen[$1]++ {print $3}'
 }
 
 # Telefon Wi-Fi-dan dusende adb-de "offline" kimi ilisib qalir ve hemin
