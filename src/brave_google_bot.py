@@ -186,23 +186,38 @@ def close_bot_tab(adb, serial, pkg, tag):
     oz tablarina toxunulmur.
     """
     open_url(adb, serial, pkg, "about:blank")
-    time.sleep(2.5)
 
-    # alt panel gizlidirse yuxari surusdurub uze cixart
-    adb_sh(adb, serial, "shell", "input", "swipe", "360", "500", "360", "1100", "300")
-    time.sleep(1.2)
+    # Sehifenin HEQIQETEN bosaldigini gozleyirik. Sabit 2.5 saniye yavas
+    # telefonda catmirdi: tab hele kohne basliqla qalirdi, "bos tab" tapilmirdi
+    # ve tab baglanmadan qalirdi (uzun muddetde yigilir).
+    for _ in range(6):
+        time.sleep(1.2)
+        if "about:blank" in (current_url(adb, serial) or ""):
+            break
 
-    xml = ui_dump(adb, serial)
-    sw = node_center(xml, r'resource-id="[^"]*tab_switcher_button"')
-    if not sw:
-        log(tag, "   (tab acari tapilmadi -- tab bos qaldi, yigilma olmayacaq)")
-        return False
-    human_tap(adb, serial, *sw)
-    time.sleep(2.5)
+    # Switcher bezen birinci cehdde acilmir -- bir nece defe cehd edirik
+    close_btn = None
+    for _ in range(3):
+        # alt panel gizlidirse yuxari surusdurub uze cixart
+        adb_sh(adb, serial, "shell", "input", "swipe", "360", "500", "360", "1100", "300")
+        time.sleep(1.2)
 
-    xml = ui_dump(adb, serial)
-    # yalniz BOS ("New tab" / "about:blank") tabin baglama duymesi
-    close_btn = node_center(xml, r'content-desc="Close (New tab|about:blank)[^"]*tab"')
+        xml = ui_dump(adb, serial)
+        sw = node_center(xml, r'resource-id="[^"]*tab_switcher_button"')
+        if not sw:
+            continue
+        human_tap(adb, serial, *sw)
+        time.sleep(2.5)
+
+        xml = ui_dump(adb, serial)
+        # yalniz BOS ("New tab" / "about:blank") tabin baglama duymesi
+        close_btn = node_center(
+            xml, r'content-desc="Close (New tab|about:blank|Yeni tab)[^"]*"')
+        if close_btn:
+            break
+        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1.5)
+
     if not close_btn:
         log(tag, "   (bos tabin baglama duymesi tapilmadi -- tab bos qaldi)")
         adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
