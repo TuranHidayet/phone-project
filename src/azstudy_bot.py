@@ -482,7 +482,7 @@ def main():
         err = msgs[0].lstrip("! ").strip() if msgs else "namelum xeta"
         stats.record(serial, prof["model"], prof["android"], args.query,
                      "error", time.time() - t_start, error=err,
-                     name=prof.get("name"))
+                     name=prof.get("name"), hw=prof.get("hw"))
         notify.send(f"❌ <b>{prof.get('name') or prof['model']}</b>\n"
                     f"Bot xəta ilə dayandı:\n{err}")
         last = os.path.join(tempfile.gettempdir(), "azstudybot-last.png")
@@ -575,7 +575,7 @@ def main():
 
     secs = time.time() - t_start
     stats.record(serial, prof["model"], prof["android"], args.query,
-                 "ok", secs, url=after, name=prof.get("name"))
+                 "ok", secs, url=after, name=prof.get("name"), hw=prof.get("hw"))
     # Her ugurlu is ucun bildiris SUSMAYA gore gonderilmir (gunde ~280 mesaj
     # olardi); yalniz NOTIFY_EACH_RUN=1 verilibse gonderilir. Xetalar ve
     # gunluk hesabat her halda gedir.

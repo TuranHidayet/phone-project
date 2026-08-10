@@ -63,7 +63,7 @@ def pretty_model(model, serial=""):
 
 
 def record(serial, model, android, query, status, secs, url=None, error=None,
-           name=None):
+           name=None, hw=None):
     """Bir isin neticesini yazir. Yazma alinmasa proses DAYANMIR."""
     try:
         os.makedirs(os.path.dirname(RUNS_FILE), exist_ok=True)
@@ -71,6 +71,7 @@ def record(serial, model, android, query, status, secs, url=None, error=None,
             "ts": time.time(),
             "date": datetime.date.today().isoformat(),
             "serial": serial,
+            "hw": hw or serial,
             "model": model,
             "name": name or model,
             "android": android,
@@ -149,7 +150,10 @@ def build_report(period="day", ref=None):
     # cihaz -> statistika
     devs = {}
     for r in rows:
-        key = r.get("serial") or "?"
+        # Qruplasdirma APARAT SERIALINA goredir: telefonun IP-si deyisende
+        # (ev sebekesi bunu tez-tez edir) eyni telefon iki cihaz kimi
+        # hesablanirdi. Kohne qeydlerde hw yoxdur -> cihaz adina gore birlesir.
+        key = r.get("hw") or r.get("name") or r.get("serial") or "?"
         d = devs.setdefault(key, {"model": r.get("name") or r.get("model"),
                                   "ok": 0, "err": 0, "secs": 0.0, "errors": []})
         # Kohne qeydlerde satis adi ("REDMI 15C") yoxdur, yalniz model kodu var.

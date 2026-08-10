@@ -123,11 +123,15 @@ def device_profile(adb, serial):
         name = f"{brand} {market}".strip() if brand and not market.lower().startswith(brand.lower()) else market
     else:
         name = f"{brand} {model}".strip() if brand else model
+    # Aparat seriali: telefonun IP-si deyisse de SABIT qalir -- statistikada
+    # cihazlari bununla teklesdiririk (yoxsa bir telefon IP-ye gore bir nece
+    # "ayri cihaz" kimi hesablanir).
+    hw = adb_sh(adb, serial, "shell", "getprop", "ro.serialno") or serial
     m = re.search(r"(\d+)x(\d+)", adb_sh(adb, serial, "shell", "wm", "size"))
     size = (int(m.group(1)), int(m.group(2))) if m else (1080, 1920)
     dump = adb_sh(adb, serial, "shell", "dumpsys", "package", CHROME_PKG)
     cm = re.search(r"versionName=([\d.]+)", dump)
-    return {"serial": serial, "model": model, "name": name, "brand": brand,
+    return {"serial": serial, "hw": hw, "model": model, "name": name, "brand": brand,
             "android": android, "size": size, "chrome": cm.group(1) if cm else None}
 
 
