@@ -147,13 +147,28 @@ def build_report(period="day", ref=None):
     if not rows:
         return f"<b>{title}</b>\n\nBu dövrdə heç bir iş qeydə alınmayıb."
 
-    # cihaz -> statistika
+    # Qruplasdirma APARAT SERIALINA goredir: telefonun IP-si deyisende
+    # (ev sebekesi bunu tez-tez edir) eyni telefon iki cihaz kimi hesablanirdi.
+    #
+    # Kohne qeydlerde "hw" sahesi hec yoxdur. Onlari da duz qrupa salmaq ucun
+    # once ad -> aparat seriali xeritesini quruq: eger bir ad yalniz BIR
+    # aparat serialina uygun gelirse, hemin adli kohne qeydler de o cihaza
+    # yazilir. Eyni adli iki telefon olsa xerite iki-menali olur ve onda
+    # kohne qeydler ada gore ayri qalir (sehv birlesdirmedense bu yaxsidir).
+    name_to_hw = {}
+    for r in rows:
+        hw, nm = r.get("hw"), r.get("name")
+        if hw and nm:
+            if nm in name_to_hw and name_to_hw[nm] != hw:
+                name_to_hw[nm] = None          # iki-menali
+            else:
+                name_to_hw.setdefault(nm, hw)
+
     devs = {}
     for r in rows:
-        # Qruplasdirma APARAT SERIALINA goredir: telefonun IP-si deyisende
-        # (ev sebekesi bunu tez-tez edir) eyni telefon iki cihaz kimi
-        # hesablanirdi. Kohne qeydlerde hw yoxdur -> cihaz adina gore birlesir.
-        key = r.get("hw") or r.get("name") or r.get("serial") or "?"
+        key = (r.get("hw")
+               or name_to_hw.get(r.get("name"))
+               or r.get("name") or r.get("serial") or "?")
         d = devs.setdefault(key, {"model": r.get("name") or r.get("model"),
                                   "ok": 0, "err": 0, "secs": 0.0, "errors": []})
         # Kohne qeydlerde satis adi ("REDMI 15C") yoxdur, yalniz model kodu var.
@@ -173,10 +188,19 @@ def build_report(period="day", ref=None):
     total_err = sum(d["err"] for d in devs.values())
     total_secs = sum(d["secs"] for d in devs.values())
 
+    # Eyni adli bir nece telefon varsa (mes. iki REDMI 15C) etiketler
+    # ferqlenmelidir -- yoxsa hesabatda hansinin hansi oldugu bilinmir.
+    name_count = {}
+    for d in devs.values():
+        name_count[d["model"]] = name_count.get(d["model"], 0) + 1
+
     lines = [f"<b>{title}</b>", ""]
     for serial, d in sorted(devs.items(), key=lambda kv: -kv[1]["ok"]):
         avg = (d["secs"] / d["ok"]) if d["ok"] else 0
-        lines.append(f"📱 <b>{pretty_model(d['model'], serial)}</b>")
+        label = pretty_model(d["model"], serial)
+        if name_count.get(d["model"], 0) > 1:
+            label += f" · {str(serial)[-4:]}"
+        lines.append(f"📱 <b>{label}</b>")
         lines.append(f"    ✅ tamamlanan: <b>{d['ok']}</b>   ❌ xəta: {d['err']}")
         if d["ok"]:
             lines.append(f"    ⏱ orta müddət: {avg:.0f} san   "
