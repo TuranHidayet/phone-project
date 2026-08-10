@@ -58,9 +58,25 @@ Dövr: hər $((CYCLE / 60)) dəqiqə"
 n=0
 fails=0
 phones_missing=0
+prev_end=$(date +%s)
+last_serials=""
 while true; do
     n=$((n + 1))
     t0=$(date +%s)
+
+    # FASILE ASKARLAMASI: komputer yatanda (qapaq baglananda) bu proses
+    # oldurulmur, sadece DONUR -- oyananda davam edir. Yeni proses
+    # baslamadigi ucun "dayandi/basladi" mesajlari da gelmir, halbuki
+    # arada saatlarla is dayanmis ola biler. Ona gore iki dovr arasindaki
+    # real fasileni olcub ozumuz xeber veririk.
+    gap=$(( t0 - prev_end ))
+    if [ "$gap" -gt $(( CYCLE * 2 )) ]; then
+        tg "▶️ <b>İş bərpa olundu</b>
+Fasilə: <b>$(( gap / 60 )) dəqiqə</b> (təxminən $(( gap / CYCLE )) dövr buraxıldı).
+Səbəb: kompüter yatmışdı, şəbəkə kəsilmişdi və ya proses dayanmışdı."
+        echo "    XEBERDARLIQ: $(( gap / 60 )) deqiqe fasile askarlandi"
+    fi
+
     echo "=== $(date '+%F %T') | dovr #$n baslayir ==="
 
     # Telefonlari tap (IP deyisibse ozu axtarir, sonradan qosulani da goturur)
@@ -77,7 +93,18 @@ Dövrlər telefon qayıdana qədər atlanacaq."
         phones_missing=$((phones_missing + 1))
     else
         cnt=$(echo "$SERIALS" | grep -c .)
-        echo "    $cnt telefon: $(echo $SERIALS | tr '\n' ' ')"
+        flat=$(echo $SERIALS | tr '\n' ' ')
+        echo "    $cnt telefon: $flat"
+
+        # Cihazin unvani deyisibse xeber ver -- bu gun IP iki defe deyisdi
+        # (192.168.31.36 -> 192.168.1.134), sebebi anlamaq ucun faydalidir.
+        if [ -n "$last_serials" ] && [ "$flat" != "$last_serials" ]; then
+            tg "📶 <b>Cihaz ünvanı dəyişdi</b>
+əvvəl: $last_serials
+indi: $flat"
+        fi
+        last_serials="$flat"
+
         if [ "$phones_missing" -gt 0 ]; then
             tg "✅ <b>Telefon qayıtdı</b>
 $cnt cihaz qoşuludur, dövrlər davam edir ($phones_missing dövr atlanmışdı)."
@@ -113,7 +140,8 @@ $fails uğursuz dövrdən sonra bot yenidən normal işləyir."
             fails=0
         fi
     fi
-    el=$(( $(date +%s) - t0 ))
+    prev_end=$(date +%s)
+    el=$(( prev_end - t0 ))
     echo "=== $(date '+%F %T') | dovr #$n bitdi (kod=$rc, ${el} san) ==="
 
     if [ "$el" -lt "$CYCLE" ]; then
