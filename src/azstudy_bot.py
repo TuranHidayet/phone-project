@@ -179,6 +179,13 @@ def find_highlight(png_path, size):
     px = im.load()
     x_max = int(w * 0.85)              # scrollbar isareleri sag kenardadir
     y_min = int(h * 0.20)              # find paneli / unvan setri istisna
+    # Hedler EKRAN OLCUSUNE nisbidir: telefonlar ferqli olcudedir
+    # (720x1600 vs 1080x2340) -- sabit piksel qiymetleri boyuk ekranda
+    # isiqlanmani/duymeni tapa bilmirdi.
+    y_gap = max(20, int(h * 0.025))    # eyni zolagin setirleri arasi
+    x_gap = max(15, int(w * 0.042))    # eyni obyektin pikselleri arasi
+    min_w = max(25, int(w * 0.055))
+    min_h = max(10, int(h * 0.009))
     hits = []
     for y in range(y_min, h - 100, 2):
         for x in range(8, x_max, 2):
@@ -195,7 +202,7 @@ def find_highlight(png_path, size):
     hits.sort(key=lambda p: p[1])
     ybands, cur = [], [hits[0]]
     for p in hits[1:]:
-        if p[1] - cur[-1][1] <= 40:
+        if p[1] - cur[-1][1] <= y_gap:
             cur.append(p)
         else:
             ybands.append(cur)
@@ -207,7 +214,7 @@ def find_highlight(png_path, size):
         band.sort(key=lambda p: p[0])
         sub = [band[0]]
         for p in band[1:]:
-            if p[0] - sub[-1][0] <= 30:
+            if p[0] - sub[-1][0] <= x_gap:
                 sub.append(p)
             else:
                 clusters.append(sub)
@@ -222,7 +229,7 @@ def find_highlight(png_path, size):
         ys = [p[1] for p in cl]
         bw = max(xs) - min(xs) + 2
         bh = max(ys) - min(ys) + 2
-        if bw < 40 or bh < 14:
+        if bw < min_w or bh < min_h:
             return 0.0
         return len(cl) / max(1.0, (bw / 2) * (bh / 2))
 
@@ -250,6 +257,13 @@ def find_more_button(png_path):
     # Astana 45% -- duymenin metn setrinde (ustelik Find-in-page isiqlanmasi
     # varsa daha da) boz piksel sayi azalir.
     need = int(w * 0.45)
+    # Nisbi hedler (720x1600 etalonuna gore olculub)
+    btn_h_min = int(h * 0.0375)        # ~60 px @1600
+    btn_h_max = int(h * 0.094)         # ~150 px @1600
+    row_gap = int(h * 0.0225)          # ~36 px @1600 (duymenin metn setri)
+    edge = max(10, int(w * 0.014))     # ~10 px @720
+    inset = max(25, int(w * 0.055))    # ~40 px @720
+    footer_span = int(h * 0.26)        # ~420 px @1600
 
     def is_gray(x, y):
         """
@@ -268,9 +282,9 @@ def find_more_button(png_path):
     for y in range(int(h * 0.25), h - 60, 3):
         # duymenin SOL/SAG kenarinda ag bosluq var; tam enli boz bolme (mes.
         # "Bunlari da axtarirlar" fonu, altbilgi) bu sertde kesilir
-        if not (is_white(10, y) and is_white(w - 10, y)):
+        if not (is_white(edge, y) and is_white(w - edge, y)):
             continue
-        cnt = sum(1 for x in range(20, w - 20, 3) if is_gray(x, y))
+        cnt = sum(1 for x in range(2 * edge, w - 2 * edge, 3) if is_gray(x, y))
         if cnt * 3 >= need:
             rows.append(y)
     if not rows:
@@ -281,7 +295,7 @@ def find_more_button(png_path):
     # bolurdu -- ona gore ardicilliq bir az yumsaq yoxlanilir.
     bands, cur = [], [rows[0]]
     for y in rows[1:]:
-        if y - cur[-1] <= 36:
+        if y - cur[-1] <= row_gap:
             cur.append(y)
         else:
             bands.append(cur)
@@ -290,14 +304,14 @@ def find_more_button(png_path):
 
     out = []
     for b in bands:
-        if not (60 <= (b[-1] - b[0]) <= 150):
+        if not (btn_h_min <= (b[-1] - b[0]) <= btn_h_max):
             continue
         # Duyme neredeyse tam eni tutur -> her iki kenari boz olmalidir.
         # Yoxlama zolagin TAM ORTASINDA aparilir: duyme tam yuvarlaqdir
         # (radius ~ hundurluyun yarisi), ona gore yuxarida/asagida kenarlar
         # hele agdir -- yalniz ortada en genis olur.
         y_test = (b[0] + b[-1]) // 2
-        if is_gray(40, y_test) and is_gray(w - 40, y_test):
+        if is_gray(inset, y_test) and is_gray(w - inset, y_test):
             out.append(b)
     if not out:
         return None
@@ -306,8 +320,8 @@ def find_more_button(png_path):
     # hemen ustundedir. Bu sert orta sehifedeki boz kartlari kesir -- onlara
     # toxunanda botun sehv linke dusmesinin sebebi bu idi.
     def footer_below(band):
-        for y in range(band[-1] + 10, min(h - 5, band[-1] + 420), 6):
-            if (not is_white(10, y)) and is_gray(10, y) and is_gray(w - 10, y):
+        for y in range(band[-1] + 10, min(h - 5, band[-1] + footer_span), 6):
+            if (not is_white(edge, y)) and is_gray(edge, y) and is_gray(w - edge, y):
                 return True
         return False
 

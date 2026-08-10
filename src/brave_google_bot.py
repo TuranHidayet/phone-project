@@ -287,25 +287,32 @@ def clear_browsing_data(adb, serial, tag):
     xml = ui_dump(adb, serial)
     _set_clear_checkboxes(adb, serial, xml)
 
-    # Time range -> All time (siyahida sonuncu variant)
+    # Time range -> "All time" (siyahida sonuncu variant).
+    #
+    # DIQQET: bu addim MECBURI DEYIL. Evvel siyahi acilmayanda BACK basilirdi,
+    # bu da butun ekrandan cixirdi ve "Delete data" tapilmirdi -- yeni bir
+    # telefonda temizlik tamam atlanirdi. Indi siyahi acilmasa sadece defolt
+    # aralig ("Last hour") ile davam edirik: bot her 4 deqiqede temizlediyi
+    # ucun bir saatliq aralig onsuz da butun izleri tutur.
     spinner = node_center(xml, r'resource-id="[^"]*id/spinner"')
     if spinner:
-        human_tap(adb, serial, *spinner)
-        time.sleep(1.1)
-        xml2 = ui_dump(adb, serial)
-        opts = []
-        for chunk in xml2.split("<node")[1:]:
-            if 'resource-id="android:id/text1"' in chunk:
-                b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
-                if b:
-                    x1, y1, x2, y2 = map(int, b.groups())
-                    opts.append(((x1 + x2) // 2, (y1 + y2) // 2))
-        if len(opts) >= 2:
-            human_tap(adb, serial, *opts[-1])   # sonuncu = "All time"
-            time.sleep(1.1)
+        for attempt in range(2):
+            human_tap(adb, serial, *spinner)
+            time.sleep(1.4)
+            xml2 = ui_dump(adb, serial)
+            opts = []
+            for chunk in xml2.split("<node")[1:]:
+                if 'resource-id="android:id/text1"' in chunk:
+                    b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
+                    if b:
+                        x1, y1, x2, y2 = map(int, b.groups())
+                        opts.append(((x1 + x2) // 2, (y1 + y2) // 2))
+            if len(opts) >= 2:               # siyahi acildi
+                human_tap(adb, serial, *opts[-1])   # sonuncu = "All time"
+                time.sleep(1.1)
+                break
         else:
-            adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
-            time.sleep(1)
+            log(tag, "   (vaxt araligi siyahisi acilmadi -- defolt aralig ile davam)")
 
     # "Delete data" duymesi bezen ekran hele qurulmadigi ucun tapilmir --
     # bir nece defe yoxlanilir (metnle de: id deyisirse ehtiyat variant).
