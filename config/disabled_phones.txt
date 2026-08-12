@@ -1,0 +1,13 @@
+# BOTUN ISLEMEYECEYI TELEFONLAR
+#
+# Burada sadalanan cihazlar find_phone.sh terefinden ATLANIR, yeni bot onlarda
+# islemir (telefon Wi-Fi-da qosulu olsa da). Sətirdə bunlardan biri yazila biler:
+#   - aparat seriali   (mes. Z9GY9HEEGIEQWG6P)  <- en dequqi
+#   - satis adi        (mes. REDMI 15C)
+#   - model kodu       (mes. 25078RA3EY)
+# Boyuk/kicik herf ferqi yoxdur. '#' ile baslayan setirler qeyddir.
+#
+# Telefonu YENIDEN ise salmaq ucun hemin setri sil (ve ya qarsisina # qoy).
+
+# 2026-08-10: istifadeci teleb etdi -- hele ki bot bu telefonda islemesin
+Z9GY9HEEGIEQWG6P

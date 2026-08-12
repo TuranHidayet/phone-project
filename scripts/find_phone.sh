@@ -18,8 +18,26 @@ source scripts/env.sh
 
 ADB="$ANDROID_HOME/platform-tools/adb"
 IPFILE="logs/phone_ip"
+DISABLED="config/disabled_phones.txt"     # botun islemeyeceyi telefonlar
 WANT="${PHONES:-1}"
 mkdir -p logs
+
+# Sondurulmus cihazlar: aparat seriali / satis adi / model kodu ile yazila biler
+is_disabled () {   # $1=hw $2=ad $3=model
+    [ -f "$DISABLED" ] || return 1
+    local line
+    while IFS= read -r line; do
+        line=$(echo "$line" | sed 's/#.*//' | tr -d '[:space:]')
+        [ -z "$line" ] && continue
+        for v in "$1" "$2" "$3"; do
+            [ -n "$v" ] || continue
+            if [ "$(echo "$v" | tr -d '[:space:]' | tr 'A-Z' 'a-z')" = "$(echo "$line" | tr 'A-Z' 'a-z')" ]; then
+                return 0
+            fi
+        done
+    done < "$DISABLED"
+    return 1
+}
 
 ready_serials () {
     # BIR CIHAZ BIR NECE ADLA gorune biler: IP:5555, IP:43997 (simsiz sazlama
@@ -33,6 +51,11 @@ ready_serials () {
         [ -n "$s" ] || continue
         hw=$("$ADB" -s "$s" shell getprop ro.serialno < /dev/null 2>/dev/null | tr -d '\r\n')
         [ -z "$hw" ] && hw="$s"
+        nm=$("$ADB" -s "$s" shell getprop ro.product.marketname < /dev/null 2>/dev/null | tr -d '\r\n')
+        md=$("$ADB" -s "$s" shell getprop ro.product.model < /dev/null 2>/dev/null | tr -d '\r\n')
+        if is_disabled "$hw" "$nm" "$md"; then
+            continue                     # config/disabled_phones.txt-de sondurulub
+        fi
         # Ustunluk: sabit :5555 (yeniden baslatmadan sonra da eyni qalir) >
         # tesadufi simsiz-sazlama portu > mDNS adi
         case "$s" in
