@@ -9,5 +9,6 @@
 #
 # Telefonu YENIDEN ise salmaq ucun hemin setri sil (ve ya qarsisina # qoy).
 
-# 2026-08-10: istifadeci teleb etdi -- hele ki bot bu telefonda islemesin
-Z9GY9HEEGIEQWG6P
+# Hazirda sondurulmus telefon yoxdur.
+# Numune (REDMI 15C-ni sondurmek ucun asagidaki setirden '#' isaresini goturun):
+# Z9GY9HEEGIEQWG6P
