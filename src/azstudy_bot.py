@@ -67,12 +67,21 @@ HL_MIN_R, HL_G_LO, HL_G_HI, HL_MAX_B = 220, 120, 210, 110
 
 def reveal_toolbar(adb, serial):
     """
-    Sehifeni asagi surusdurende Brave-in alt paneli gizlenir (menyu duymesi
-    itir). Kicik geri-surusdurme ile paneli uze cixardiriq.
+    Menyu duymesini uze cixardir. Iki hal var:
+      1) Sehifeni asagi surusdurende alt panel gizlenir -> kicik geri-surusdurme
+      2) Brave TAB SIYAHISI ekraninda qalib (evvelki isden sonra) -> orada
+         menyu yoxdur, ondan CIXMAQ lazimdir (BACK). Bu hal yoxlanmayanda bot
+         "netice tapilmadi" xetasi verirdi.
     """
-    for _ in range(3):
-        if "menu_button" in ui_dump(adb, serial):
+    for _ in range(4):
+        xml = ui_dump(adb, serial)
+        if "menu_button" in xml:
             return True
+        if ("Search your tabs" in xml or "standard tabs" in xml
+                or "tab_list_recycler_view" in xml):
+            adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1.6)
+            continue
         adb_sh(adb, serial, "shell", "input", "swipe", "360", "600", "360", "900", "300")
         time.sleep(1.1)
     return "menu_button" in ui_dump(adb, serial)

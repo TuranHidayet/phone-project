@@ -226,6 +226,11 @@ def close_bot_tab(adb, serial, pkg, tag):
     human_tap(adb, serial, *close_btn)
     time.sleep(1.5)
     log(tag, "   tab baglandi 🗙")
+    # Tab siyahisi ekranindan CIX: bele qalsa novbeti isde Brave hemin
+    # ekranda acilir, orada menyu duymesi olmur ve bot "netice tapilmadi"
+    # xetasi verirdi.
+    adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+    time.sleep(1.2)
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_HOME")
     return True
 
