@@ -6,6 +6,12 @@ QURASDIRMA (token bu fayla YAZILMIR, ayrica konfiqde saxlanir):
     ~/.config/azstudy/telegram.env
         TELEGRAM_TOKEN=123456:AA...
         TELEGRAM_CHAT_ID=123456789
+
+BIR NECE ALICI: TELEGRAM_CHAT_ID vergulle bir nece deyer qebul edir --
+mesaj hepsine gonderilir (biri alinmasa qalanlari yene gedir):
+        TELEGRAM_CHAT_ID=123456789,-1001234567890
+Qrup chat_id-si MENFI olur (mes. -1001234567890) -- botu qrupa elave edib
+`scripts/telegram_add_chat.sh` ile tapmaq en rahat yoldur.
 Fayl yoxdursa ve ya bos qalibsa butun funksiyalar SESSIZ isleyir --
 bot bildirissiz normal davam edir (bildiris ucun proses dayanmamalidir).
 
@@ -55,6 +61,11 @@ def configured():
     return bool(token and chat)
 
 
+def _chat_ids(chat):
+    """Vergulle ayrilmis chat_id siyahisi -> temiz list."""
+    return [c.strip() for c in str(chat).split(",") if c.strip()]
+
+
 def send(text, silent=False, retries=2):
     """
     Telegram-a mesaj gonderir. Ugur/ugursuzluq bool qaytarir.
@@ -64,24 +75,29 @@ def send(text, silent=False, retries=2):
     if not (token and chat):
         return False
 
-    data = urllib.parse.urlencode({
-        "chat_id": chat,
-        "text": text[:4000],           # Telegram limiti 4096
-        "parse_mode": "HTML",
-        "disable_web_page_preview": "true",
-        "disable_notification": "true" if silent else "false",
-    }).encode()
-
     url = API.format(token=token)
-    for attempt in range(retries + 1):
-        try:
-            req = urllib.request.Request(url, data=data)
-            with urllib.request.urlopen(req, timeout=15) as r:
-                return json.loads(r.read().decode()).get("ok", False)
-        except Exception:
-            if attempt < retries:
-                time.sleep(2 + attempt * 3)
-    return False
+    ok_any = False
+    # Her aliciya ayri sorgu gedir; biri alinmasa (mes. istifadeci botu
+    # bloklayib) qalanlarina gonderis DAYANMIR.
+    for cid in _chat_ids(chat):
+        data = urllib.parse.urlencode({
+            "chat_id": cid,
+            "text": text[:4000],           # Telegram limiti 4096
+            "parse_mode": "HTML",
+            "disable_web_page_preview": "true",
+            "disable_notification": "true" if silent else "false",
+        }).encode()
+        for attempt in range(retries + 1):
+            try:
+                req = urllib.request.Request(url, data=data)
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    if json.loads(r.read().decode()).get("ok", False):
+                        ok_any = True
+                    break
+            except Exception:
+                if attempt < retries:
+                    time.sleep(2 + attempt * 3)
+    return ok_any
 
 
 if __name__ == "__main__":
