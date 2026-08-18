@@ -402,6 +402,48 @@ def stable_highlight(adb, serial, size, shot, tag):
     return prev
 
 
+def airplane_cycle(adb, serial, tag, secs=3):
+    """
+    Isin sonunda ucus rejimini YANDIRIB-SONDURUR (sebeke qosulmasi sifirlanir).
+
+    NIYE BELE YAZILIB (sade `adb shell` bes etmir):
+      Telefon adb-ye Wi-Fi uzerinden qosuludur. Ucus rejimi Wi-Fi-i da sondurur,
+      yeni EMRI GONDEREN ELAQE KESILIR -- "geri sondur" emri catmaz ve telefon
+      ucus rejiminde ILISIB QALARDI. Ona gore butun ardicilliq TELEFONUN OZUNDE
+      ayrilmis proses kimi (nohup ... &) islenir: elaqe kesilse de proses
+      davam edir ve rejimi mutleq geri sondurur.
+
+    Sonra Wi-Fi qayidana qeder gozlenilir ve adb elaqesi berpa edilir ki,
+    novbeti dovr telefonu axtarmaq mecburiyyetinde qalmasin.
+    """
+    on_cmd = ("cmd connectivity airplane-mode enable || "
+              "(settings put global airplane_mode_on 1; "
+              "am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true)")
+    off_cmd = ("cmd connectivity airplane-mode disable || "
+               "(settings put global airplane_mode_on 0; "
+               "am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false)")
+    # sondurme ISTENILEN halda islensin deye ayrica ; ile yazilir (|| deyil)
+    script = f"{on_cmd}; sleep {int(secs)}; {off_cmd}"
+
+    log(tag, f"Ucus rejimi: {secs} san yandirilib sondurulur...")
+    adb_sh(adb, serial, "shell", f"nohup sh -c '{script}' >/dev/null 2>&1 &")
+
+    # Wi-Fi geri qalxana qeder gozle (adb elaqesi bu muddetde kesik olur)
+    time.sleep(secs + 4)
+    deadline = time.time() + 75
+    while time.time() < deadline:
+        subprocess.run([adb, "connect", serial],
+                       capture_output=True, text=True, timeout=20)
+        state = subprocess.run([adb, "-s", serial, "get-state"],
+                               capture_output=True, text=True, timeout=20).stdout.strip()
+        if state == "device":
+            log(tag, "   sebeke qayitdi ✅")
+            return True
+        time.sleep(4)
+    log(tag, "   (sebeke hele qayitmayib -- novbeti dovrde telefon yeniden axtarilacaq)")
+    return False
+
+
 def dismiss_popups(adb, serial, tag):
     """Translate ve bu kimi teklif pencerelerini baglayir."""
     xml = ui_dump(adb, serial)
@@ -449,6 +491,9 @@ def main():
     p.add_argument("--udid", help="Cihaz serial / IP:port")
     p.add_argument("--keep-tab", action="store_true",
                    help="Sonda tabi baglama (default: baglanir)")
+    p.add_argument("--airplane", type=int, default=3, metavar="SAN",
+                   help="Isin sonunda ucus rejimini bu qeder saniye yandirib "
+                        "sondur (0 = etme, default 3)")
     p.add_argument("--keep-data", action="store_true",
                    help="Sonda brauzer izlerini silme (default: silinir)")
     args = p.parse_args()
@@ -592,6 +637,11 @@ def main():
         notify.send(f"✅ <b>{prof.get('name') or prof['model']}</b>\n"
                     f"{after or 'azstudy.az'} — {secs:.0f} san", silent=True)
     log(tag, f"Bitdi ✅ ({secs:.0f} san)")
+
+    # EN SONDA: ucus rejimi yandirilib-sondurulur (sebeke sifirlanir).
+    # Qeyd artiq yazilib -- elaqe kesilse bele statistika itmir.
+    if args.airplane > 0:
+        airplane_cycle(adb, serial, tag, args.airplane)
 
 
 if __name__ == "__main__":
