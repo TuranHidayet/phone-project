@@ -77,10 +77,18 @@ ready_count () {
 }
 
 # 1) artiq qosulu olanlar + 2) yadda saxlanmis IP-ler
+#
+# VACIB: `adb connect` cavab vermeyen unvanda ~40 SANIYE donur. Telefonun
+# IP-si deyisende (ucus rejimi / DHCP) yadda saxlanmis unvanlar kohnelir ve
+# kesf 80 saniyeye qalxirdi. Ona gore once `nc` ile port yoxlanilir (~1 san),
+# yalniz aciq olanda adb cagirilir. Taramanin ozu cemi ~3 saniyedir.
 if [ -f "$IPFILE" ]; then
     while read -r ip; do
         [ -n "$ip" ] || continue
-        "$ADB" connect "$ip" >/dev/null 2>&1
+        host="${ip%:*}"; port="${ip##*:}"
+        if nc -z -G 1 "$host" "${port:-5555}" >/dev/null 2>&1; then
+            "$ADB" connect "$ip" >/dev/null 2>&1
+        fi
     done < "$IPFILE"
     sleep 2
 fi

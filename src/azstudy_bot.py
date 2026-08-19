@@ -428,19 +428,32 @@ def airplane_cycle(adb, serial, tag, secs=3):
     log(tag, f"Ucus rejimi: {secs} san yandirilib sondurulur...")
     adb_sh(adb, serial, "shell", f"nohup sh -c '{script}' >/dev/null 2>&1 &")
 
-    # Wi-Fi geri qalxana qeder gozle (adb elaqesi bu muddetde kesik olur)
-    time.sleep(secs + 4)
-    deadline = time.time() + 75
+    # Wi-Fi geri qalxana qeder gozle (adb elaqesi bu muddetde kesik olur).
+    #
+    # BUTUN CAGIRISLAR try/except ICINDEDIR: sebeke yoxdursa `adb connect`
+    # cavabsiz qalib timeout atirdi ve bu istisna botu COKDURURDU (is ozu
+    # ugurla bitmis olsa da dovr xeta ile qeyd olunurdu). Bu addim
+    # "ela olsa yaxsi" xarakterlidir -- hec vaxt isi ucurmamalidir.
+    # QEYD: ucus rejimindan sonra router telefona YENI IP verir (olculub:
+    # 192.168.1.140 -> .151). Ona gore kohne unvana uzun-uzadi qosulmaga
+    # calismaq menasizdir: qisa bir cehd edirik, alinmasa novbeti dovrde
+    # find_phone.sh onu ~3 saniyede tapir.
+    time.sleep(secs + 5)
+    deadline = time.time() + 15
     while time.time() < deadline:
-        subprocess.run([adb, "connect", serial],
-                       capture_output=True, text=True, timeout=20)
-        state = subprocess.run([adb, "-s", serial, "get-state"],
-                               capture_output=True, text=True, timeout=20).stdout.strip()
-        if state == "device":
-            log(tag, "   sebeke qayitdi ✅")
-            return True
-        time.sleep(4)
-    log(tag, "   (sebeke hele qayitmayib -- novbeti dovrde telefon yeniden axtarilacaq)")
+        try:
+            subprocess.run([adb, "connect", serial],
+                           capture_output=True, text=True, timeout=8)
+            state = subprocess.run([adb, "-s", serial, "get-state"],
+                                   capture_output=True, text=True,
+                                   timeout=8).stdout.strip()
+            if state == "device":
+                log(tag, "   sebeke qayitdi ✅")
+                return True
+        except Exception:
+            pass                          # timeout / adb xetasi -- normaldir
+        time.sleep(3)
+    log(tag, "   (IP deyisib -- novbeti dovrde telefon yeniden tapilacaq)")
     return False
 
 
