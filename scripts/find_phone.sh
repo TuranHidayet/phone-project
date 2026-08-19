@@ -84,9 +84,16 @@ ready_count () {
 # yalniz aciq olanda adb cagirilir. Taramanin ozu cemi ~3 saniyedir.
 if [ -f "$IPFILE" ]; then
     while read -r ip; do
-        [ -n "$ip" ] || continue
+        # Yalniz "host:port" formatinda setirler qebul edilir. Bu yoxlama
+        # vacibdir: fayl paralel yazilanda yarimciq/bos setir oxunur ve
+        # `nc`/`adb` bos deyerle cagirilib "usage" xetasi verirdi.
+        case "$ip" in
+            *[0-9].[0-9]*:[0-9]*) : ;;
+            *) continue ;;
+        esac
         host="${ip%:*}"; port="${ip##*:}"
-        if nc -z -G 1 "$host" "${port:-5555}" >/dev/null 2>&1; then
+        [ -n "$host" ] && [ -n "$port" ] || continue
+        if nc -z -G 1 "$host" "$port" >/dev/null 2>&1; then
             "$ADB" connect "$ip" >/dev/null 2>&1
         fi
     done < "$IPFILE"
@@ -119,7 +126,11 @@ if [ "$(ready_count)" -lt "$WANT" ]; then
                 "$ADB" connect "$ip" >/dev/null 2>&1
             done
             sleep 2
-            sort -u "$scan" > "$IPFILE"
+            # ATOMIK yazi: once muveqqeti fayla, sonra mv. Birbasa
+            # "> $IPFILE" yazanda paralel isleyen ikinci kesf faylin
+            # yarimciq halini oxuyurdu (bos/kesik setir -> `nc` ve `adb`
+            # "usage" xetasi).
+            sort -u "$scan" > "$IPFILE.tmp.$$" && mv -f "$IPFILE.tmp.$$" "$IPFILE"
         fi
         rm -f "$scan"
     fi
