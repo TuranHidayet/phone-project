@@ -31,7 +31,7 @@
         <key>CYCLE</key>
         <string>240</string>
         <key>PHONES</key>
-        <string>1</string>
+        <string>2</string>
     </dict>
 
     <key>RunAtLoad</key>
