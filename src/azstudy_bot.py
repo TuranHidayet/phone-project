@@ -64,6 +64,19 @@ SITE_PAGES = [
 # Find in page isiqlanmasinin rengi (narinci)
 HL_MIN_R, HL_G_LO, HL_G_HI, HL_MAX_B = 220, 120, 210, 110
 
+# Brave menyusundaki "Find in page" setri TELEFONUN DILINDE gorunur.
+# Ilk uc telefon en-US oldugu ucun hermetik ingilis metni kifayet edirdi;
+# Redmi 8 ise az-AZ-dir ve orada setir "Səhifədə tapın"-dir -- bot menyunu
+# acirdi, amma setri tapa bilmeyib "Find in page acila bilmedi" verirdi.
+# Menyu setirlerinin resource-id-si hamisinda eynidir (menu_item_text),
+# ona gore id ile secmek olmur -- taninan variantlari sadalayiriq.
+FIND_IN_PAGE_LABELS = (
+    "Find in page",         # en
+    "Səhifədə tapın",       # az
+    "Найти на странице",    # ru
+    "Sayfada bul",          # tr
+)
+
 
 def reveal_toolbar(adb, serial):
     """
@@ -132,6 +145,15 @@ def find_prev(adb, serial):
     return True
 
 
+def read_find_status(xml):
+    """Find panelindeki sayqac ("1/3", "0/0") -- yoxdursa bos setir."""
+    for chunk in xml.split("<node")[1:]:
+        if "find_status" in chunk:
+            m = re.search(r'text="([^"]*)"', chunk)
+            return m.group(1).strip() if m else ""
+    return ""
+
+
 def find_in_page(adb, serial, tag, text):
     """
     Menyu -> Find in page -> metni yazir -> KLAVIATURANI BAGLAYIR.
@@ -150,7 +172,11 @@ def find_in_page(adb, serial, tag, text):
     time.sleep(1.8)
 
     xml = ui_dump(adb, serial)
-    fip = node_center(xml, r'text="Find in page"')
+    fip = None
+    for label in FIND_IN_PAGE_LABELS:
+        fip = node_center(xml, r'text="%s"' % re.escape(label))
+        if fip:
+            break
     if not fip:
         adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
         return None
@@ -160,19 +186,33 @@ def find_in_page(adb, serial, tag, text):
     # QEYD: `input text` yalniz ASCII yaza bilir (ç, ə, ı isləmir) -- ona gore
     # axtarilan sozler ASCII olmalidir ("Daha", "azstudy.az").
     adb_sh(adb, serial, "shell", "input", "text", text.replace(" ", "%s"))
-    time.sleep(2.5)
+
+    # Netice sayi DERHAL hazir olmur. Evvel burada sabit `time.sleep(2.5)`
+    # vardi: Google SERP agir sehifedir, yavas cihazda (Note 10S, Android 13)
+    # Brave saymani hemin muddete bitirmirdi, status hele "0/0" oxunurdu.
+    # Bot bundan "bu sehifede yoxdur" neticesi cixarib nahaq yere "daha cox
+    # netice" duymesini axtarirdi ve "1-ci sehifede azstudy.az yoxdur" xetasi
+    # verirdi -- halbuki sonradan ekranda "1/3" yazilirdi.
+    # Indi sabit gozleme evezine status HAZIR OLANA QEDER gozlenilir.
+    #
+    # "0/0" DA duzgun cavab ola biler (mes. "Daha" duymesi hemin sehifede
+    # yoxdursa) -- ona gore onu derhal qebul etmirik, amma 12 saniye de
+    # gozlemirik: ust-uste IKI defe "0/0" oxunsa, sayma bitib demekdir.
+    status = ""
+    zeros = 0
+    for _ in range(12):
+        time.sleep(1.0)
+        status = read_find_status(ui_dump(adb, serial))
+        if status and status != "0/0":
+            break
+        zeros = zeros + 1 if status == "0/0" else 0
+        if zeros >= 2:
+            break
 
     hide_keyboard(adb, serial)      # yerlesim sabitlesir, isiqlanma qalir
 
-    xml = ui_dump(adb, serial)
-    status = ""
-    for chunk in xml.split("<node")[1:]:
-        if "find_status" in chunk:
-            m = re.search(r'text="([^"]*)"', chunk)
-            if m:
-                status = m.group(1).strip()
-            break
-    return status
+    # Klaviatura baglananda sayma hele davam edirse, son deyeri goturek.
+    return read_find_status(ui_dump(adb, serial)) or status
 
 
 def find_highlight(png_path, size):
@@ -579,8 +619,27 @@ def main():
     for page in range(1, MAX_PAGES + 1):
         close_find_bar(adb, serial)
         status = find_in_page(adb, serial, tag, SITE_MARK)
+
+        # BERPA: find paneli acilmadisa evvel derhal dayanirdiq ve telefon
+        # ekranda oldugu kimi ilisib qalirdi. Sebeb adeten Brave-in on plandan
+        # dusmesidir (ana ekran, baska app, ilisib qalmis dialoq).
+        # Redmi 8-de bu xususile agridir: MIUI launcher ON PLANDA olanda
+        # `uiautomator dump` umumiyyetle islemir ("could not get idle state"),
+        # yeni UI agaci oxunmur ve menyu duymesi tapilmir.
+        # Indi dayanmaq evezine Brave SERP-e QAYTARILIR ve yeniden cehd edilir.
+        for attempt in (1, 2):
+            if status is not None:
+                break
+            log(tag, f"   Brave itdi -- SERP-e qaytarilir (cehd {attempt}/2)...")
+            adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
+            adb_sh(adb, serial, "shell", "wm", "dismiss-keyguard")
+            open_url(adb, serial, BRAVE_PKG, url)
+            time.sleep(random.uniform(8, 11))
+            close_find_bar(adb, serial)
+            status = find_in_page(adb, serial, tag, SITE_MARK)
+
         if status is None:
-            bail(1, "!! Find in page acila bilmedi.")
+            bail(1, "!! Find in page acila bilmedi (2 berpa cehdinden sonra da).")
 
         if status not in ("", "0/0"):
             log(tag, f"'{SITE_MARK}' {page}-ci sehifede tapildi (status: {status}).")

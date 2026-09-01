@@ -18,6 +18,8 @@ source scripts/env.sh
 
 PIDFILE="logs/azstudy_loop.pid"
 CYCLE="${CYCLE:-240}"          # dovrun uzunlugu (saniye) -- bir dovr median 215 san
+JOB_TIMEOUT="${JOB_TIMEOUT:-330}"   # bir telefonun isi ucun ust hedd (normal is 200-280 san)
+FIND_TIMEOUT="${FIND_TIMEOUT:-90}"  # telefon kesfi ucun ust hedd (normal 3-15 san)
 
 tg () {  # Telegram-a mesaj (qurasdirilmayibsa sessiz kecir)
     $PY src/notify.py "$1" >/dev/null 2>&1 || true
@@ -80,7 +82,29 @@ Səbəb: kompüter yatmışdı, şəbəkə kəsilmişdi və ya proses dayanmış
     echo "=== $(date '+%F %T') | dovr #$n baslayir ==="
 
     # Telefonlari tap (IP deyisibse ozu axtarir, sonradan qosulani da goturur)
-    SERIALS=$(scripts/find_phone.sh 2>/dev/null || true)
+    #
+    # Kesfe de VAXT LIMITI lazimdir: find_phone.sh her cihazda
+    # `adb shell getprop ro.serialno` isledir. Telefon donarsa (adb "device"
+    # gosterir, amma adbd cavab vermir) hemin cagiris sonsuz gozleyir ve dovr
+    # hec baslamir. Limit asilanda kesf oldurulur, dovr atlanir, novbeti
+    # dovrde yeniden cehd edilir.
+    fp_out=$(mktemp)
+    scripts/find_phone.sh > "$fp_out" 2>/dev/null &
+    fp=$!
+    ( sleep "$FIND_TIMEOUT"
+      if kill -0 "$fp" 2>/dev/null; then
+          echo "    XEBERDARLIQ: kesf ${FIND_TIMEOUT} san-de bitmedi -- dayandirilir"
+          kill -9 "$fp" 2>/dev/null
+      fi ) &
+    fg=$!
+    wait "$fp" 2>/dev/null
+    # `wait` ELAVE EDILIB: sadece `kill` edende bash oldurulmus fon isini
+    # loga "Terminated: ..." setri kimi yazir ve her dovrde skriptin oz kodu
+    # loga dusurdu. `wait` prosesi sessizce yigisdirir.
+    kill "$fg" 2>/dev/null
+    wait "$fg" 2>/dev/null || true
+    SERIALS=$(cat "$fp_out" 2>/dev/null || true)
+    rm -f "$fp_out"
     if [ -z "$SERIALS" ]; then
         echo "    telefon tapilmadi (sonduruludur / Wi-Fi-da deyil) -- bu dovr atlanir"
         rc=90
@@ -113,14 +137,36 @@ $cnt cihaz qoşuludur, dövrlər davam edir ($phones_missing dövr atlanmışdı
 
         # Her telefon ucun bot PARALEL isleyir -- ardicil olsa 2 telefon
         # dovr uzunluguna sigmazdi.
+        #
+        # VAXT LIMITI (gozetci): telefon donarsa (adb port aciq qalir, ping
+        # kecir, amma adbd cavab vermir -- Redmi 8-de yasandi) bot sonsuza
+        # qeder gozleyir. Asagidaki `wait` BUTUN botlari gozledigi ucun bir
+        # donmus telefon dovru tamamile bloklayirdi: qalan telefonlar isini
+        # bitirse de dovr baglanmirdi ve loop saatlarla dayanirdi.
+        # Indi her bota gozetci qosulur -- limiti asan bot oldurulur, dovr
+        # davam edir, hemin telefon novbeti dovrde yeniden yoxlanilir.
         pids=""
+        guards=""
         for s in $SERIALS; do
             $PY src/azstudy_bot.py --udid "$s" &
-            pids="$pids $!"
+            bp=$!
+            pids="$pids $bp"
+            ( sleep "$JOB_TIMEOUT"
+              if kill -0 "$bp" 2>/dev/null; then
+                  echo "    XEBERDARLIQ: $s ${JOB_TIMEOUT} san-de bitmedi -- bot dayandirilir"
+                  kill -9 "$bp" 2>/dev/null
+              fi ) &
+            guards="$guards $!"
         done
         rc=0
         for p in $pids; do
             wait "$p" || rc=$?
+        done
+        # Botlar normal bitibse gozetcileri legv edirik, yoxsa hər dövrdən
+        # bos `sleep` prosesleri yigilib qalar.
+        for g in $guards; do
+            kill "$g" 2>/dev/null
+            wait "$g" 2>/dev/null || true
         done
 
         # Ust-uste xetalar: her xeta ucun bot ozu mesaj gonderir, burada ise
