@@ -331,7 +331,7 @@ def _set_clear_checkboxes(adb, serial, xml, close_tabs=True):
                     time.sleep(0.7)
 
 
-def clear_browsing_data(adb, serial, tag, close_tabs=True):
+def clear_browsing_data(adb, serial, tag, close_tabs=True, set_range=False):
     """
     Botun izlerini silir: Menyu -> History -> Delete browsing data ->
     All time -> Delete data. Tarixce, kuki ve kes gedir; parollar, autofill ve
@@ -365,7 +365,7 @@ def clear_browsing_data(adb, serial, tag, close_tabs=True):
         log(tag, "   (menyu duymesi tapilmadi -- temizlik atlanir)")
         return False
     human_tap(adb, serial, *menu)
-    time.sleep(1.8)
+    time.sleep(1.2)
 
     xml = ui_dump(adb, serial)
     hist = node_center(xml, r'text="(History|Tarix[^"]*)"')
@@ -374,7 +374,7 @@ def clear_browsing_data(adb, serial, tag, close_tabs=True):
         adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
         return False
     human_tap(adb, serial, *hist)
-    time.sleep(2.2)
+    time.sleep(1.4)
 
     xml = ui_dump(adb, serial)
     btn = node_center(xml, r'resource-id="[^"]*clear_browsing_data_button"')
@@ -383,19 +383,23 @@ def clear_browsing_data(adb, serial, tag, close_tabs=True):
         adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
         return False
     human_tap(adb, serial, *btn)
-    time.sleep(2.2)
+    time.sleep(1.4)
 
     xml = ui_dump(adb, serial)
     _set_clear_checkboxes(adb, serial, xml, close_tabs)
 
     # Time range -> "All time" (siyahida sonuncu variant).
     #
-    # DIQQET: bu addim MECBURI DEYIL. Evvel siyahi acilmayanda BACK basilirdi,
-    # bu da butun ekrandan cixirdi ve "Delete data" tapilmirdi -- yeni bir
-    # telefonda temizlik tamam atlanirdi. Indi siyahi acilmasa sadece defolt
-    # aralig ("Last hour") ile davam edirik: bot her 4 deqiqede temizlediyi
-    # ucun bir saatliq aralig onsuz da butun izleri tutur.
-    spinner = node_center(xml, r'resource-id="[^"]*id/spinner"')
+    # DEFOLT OLARAQ ATLANIR (set_range=False). Sebeb: bu addim 1-2 elave
+    # `uiautomator dump` demekdir, bu telefonda her biri ~5 saniye -- olculub
+    # ki, butun temizlik 43 saniye cekir ve bunun teqriben dordde biri buradir.
+    # Atlamaq TEHLUKESIZDIR:
+    #   - Brave vaxt araligini YADDA SAXLAYIR, ona gore evvel secilmis "All
+    #     time" qalir;
+    #   - hetta defolt "Last hour" olsa bele, bot her 4 deqiqede temizlediyi
+    #     ucun bir saatliq aralig butun izleri onsuz da tutur.
+    # Lazim olsa set_range=True ile qaytarmaq olar.
+    spinner = node_center(xml, r'resource-id="[^"]*id/spinner"') if set_range else None
     if spinner:
         for attempt in range(2):
             human_tap(adb, serial, *spinner)
