@@ -379,6 +379,62 @@ def find_more_button(png_path):
     return (w // 2, (b[0] + b[-1]) // 2)
 
 
+def find_result_by_scroll(adb, serial, size, tag, max_scrolls=14):
+    """
+    Google neticelerinde azstudy.az-i SEHIFENI SURUSDUREREK tapir.
+    Qaytarir: toxunulacaq (x, y) ve ya None.
+
+    NIYE BELE (2026-09-07): evvel netice Brave-in "Find in page" funksiyasi ile
+    taplirdi -- menyu acilir, "https://azstudy.az" yazilir, tapilan yer NARINCI
+    isiqlanir, ekran sekli cekilib hemin narinci zolagin pikselleri axtarilirdi.
+    Bu zencir uzun ve kovrek idi: menyu setri telefonun dilinden asili, isiqlanma
+    rengi Google/Brave temasindan asili, ekran sekli ise yavas cihazda 40 saniye
+    ceke bilir. Indi ise sadece SURUSDURUB UI AGACINDAN oxuyuruq.
+
+    VACIB OLCU: Android ekrandan KENARDAKI veb node-larin heqiqi koordinatini
+    vermir -- hamisini eyni serhed qiymetine "yapisdirir" (bu telefonda y=2079,
+    ekran 2340). Ona gore "node-u tap, sonra ona teref surusdur" usulu ISLEMIR;
+    node ekrana DUSENE qeder surusdurub y-nin heqiqi qiymet aldigini gozlemek
+    lazimdir. Ust hedd 0.85h secilib ki, hemin serhed qiymeti kenarda qalsin.
+
+    Netice olaraq URL setri ("https://azstudy.az") axtarilir: bu, saytin oz
+    neticelerinde olur, Instagram/Facebook neticelerinde ise olmur -- ona gore
+    sehv karta toxunmuruq.
+    """
+    w, h = size
+    y_lo, y_hi = h * 0.15, h * 0.85
+
+    for i in range(max_scrolls):
+        xml = ui_dump(adb, serial)
+
+        # Agac bos gelibse (sehife hele yuklenir) surusdurmek kome etmir.
+        if xml.count("<node") == 0:
+            time.sleep(1.8)
+            continue
+
+        for chunk in xml.split("<node")[1:]:
+            m = re.search(r'text="([^"]*)"', chunk)
+            if not m or SITE_MARK not in m.group(1):
+                continue
+            b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
+            if not b:
+                continue
+            x1, y1, x2, y2 = map(int, b.groups())
+            cy = (y1 + y2) // 2
+            if y_lo <= cy <= y_hi:
+                log(tag, f"   netice {i + 1}-ci baxisda ekranda gorundu")
+                return (x1 + x2) // 2, cy
+
+        # Gorunmedi -- bir addim asagi. Insan kimi: orta suretli tek swipe.
+        x = int(w * random.uniform(0.45, 0.55))
+        adb_sh(adb, serial, "shell", "input", "swipe",
+               str(x), str(int(h * 0.75)), str(x), str(int(h * 0.32)),
+               str(random.randint(260, 460)))
+        time.sleep(random.uniform(1.1, 2.0))
+
+    return None
+
+
 def goto_more_button(adb, serial, tag, shot):
     """
     "Daha cox netice" duymesine catir ve onun DEQIQ yerini qaytarir.
@@ -800,52 +856,50 @@ def main():
     after = ""
     found = False
     for page in range(1, MAX_PAGES + 1):
-        close_find_bar(adb, serial)
-        status = find_in_page(adb, serial, tag, SITE_MARK)
+        pos = find_result_by_scroll(adb, serial, size, tag)
 
-        # BERPA: find paneli acilmadisa evvel derhal dayanirdiq ve telefon
-        # ekranda oldugu kimi ilisib qalirdi. Sebeb adeten Brave-in on plandan
-        # dusmesidir (ana ekran, baska app, ilisib qalmis dialoq).
-        # Redmi 8-de bu xususile agridir: MIUI launcher ON PLANDA olanda
-        # `uiautomator dump` umumiyyetle islemir ("could not get idle state"),
-        # yeni UI agaci oxunmur ve menyu duymesi tapilmir.
-        # Indi dayanmaq evezine Brave SERP-e QAYTARILIR ve yeniden cehd edilir.
+        # BERPA: netice tapilmadisa evvelce Brave-in hele SERP-de olduguna
+        # baxiriq. Brave on plandan dusubse (ana ekran, ilisib qalmis dialoq)
+        # agac oxunmur ve netice "yoxdur" kimi gorunur -- bu, sehifede
+        # heqiqeten olmamasindan FERQLI haldir.
         for attempt in (1, 2):
-            if status is not None:
+            if pos is not None:
                 break
+            u = current_url(adb, serial) or ""
+            if "google" in u:
+                break                     # SERP-dedik, sadece bu sehifede yoxdur
             log(tag, f"   Brave itdi -- SERP-e qaytarilir (cehd {attempt}/2)...")
             adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
             adb_sh(adb, serial, "shell", "wm", "dismiss-keyguard")
             open_url(adb, serial, BRAVE_PKG, url)
             time.sleep(random.uniform(8, 11))
-            close_find_bar(adb, serial)
-            status = find_in_page(adb, serial, tag, SITE_MARK)
+            pos = find_result_by_scroll(adb, serial, size, tag)
 
-        if status is None:
-            bail(1, "!! Find in page acila bilmedi (2 berpa cehdinden sonra da).")
-
-        if status not in ("", "0/0"):
-            log(tag, f"'{SITE_MARK}' {page}-ci sehifede tapildi (status: {status}).")
-            hl = stable_highlight(adb, serial, size, shot, tag)
-            if not hl:
-                bail(1, "!! Narinci isiqlanma ekranda tapilmadi.")
-            # Isiqlanmanin OZUNE toxunuruq: mobil Google-da netice blokunun
-            # URL setri de klikleniendir. Altdaki "mavi basliq"i axtarmaq sehv
-            # idi -- ziyaret edilmis linkler benovseyi olur, detektor onlari
-            # gormur ve asagidaki yad neticeni secirdi.
-            log(tag, f"-> neticeye toxunulur ({int(hl[0])},{int(hl[1])})")
-            human_tap(adb, serial, *hl)
+        if pos is not None:
+            log(tag, f"'{SITE_MARK}' {page}-ci sehifede tapildi (scroll ile).")
+            # URL setrinin OZUNE toxunuruq: mobil Google-da netice blokunun
+            # URL setri de klikleniendir. Altdaki basliq ziyaret edilibse
+            # rengi deyisir, ona gore etibarli olan URL setridir.
+            log(tag, f"-> neticeye toxunulur ({pos[0]},{pos[1]})")
+            human_tap(adb, serial, *pos)
             time.sleep(random.uniform(6, 9))
             dismiss_popups(adb, serial, tag)
 
-            after = current_url(adb, serial)
-            if SITE_HOST not in after:
-                time.sleep(4)
-                after = current_url(adb, serial)
+            # Unvani sayt acilana qeder gozle. Sabit gozleme mobil datada
+            # catmirdi; ustelik BOS unvan "sehv sehife" saylirdi -- halbuki
+            # bos deyer sadece "unvan setri oxunmadi" demekdir (panel gizli
+            # ola biler). Bu, nahaq yere SERP-e qayitmaga sebeb olurdu.
+            after = ""
+            deadline = time.time() + 15
+            while time.time() < deadline:
+                after = current_url(adb, serial) or ""
+                if SITE_HOST in after:
+                    break
+                time.sleep(2)
             if SITE_HOST in after:
                 found = True
                 break
-            log(tag, f"   sehv sehife acildi ({after or '?'}) -- SERP-e qayidilir")
+            log(tag, f"   sehv sehife acildi ({after or 'unvan oxunmadi'}) -- SERP-e qayidilir")
             adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
             time.sleep(random.uniform(5, 7))
             continue
