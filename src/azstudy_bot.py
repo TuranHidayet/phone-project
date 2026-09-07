@@ -6,13 +6,28 @@ Google-da "xaricde tehsil azstudy" axtarir -> neticelerde azstudy.az-i tapib
 REAL barmaqla acir -> saytda verilen muddet qeder (default 90 san) gezir:
 scroll edir, daxili sehifelere kecir -> sonda izleri silir, tabi baglayir.
 
-AZSTUDY.AZ NECE TAPILIR:
-  Google neticeleri arasinda oz saytimizi tapmaq ucun Brave-in oz
-  "Find in page" funksiyasi istifade olunur: "azstudy" yazilir, tapilan yer
-  NARINCI isiqlanir. Ekran seklinden hemin narinci zolagin yeri tapilir ve
-  ora toxunulur (sag kenardaki scrollbar gostericisi istisna edilir).
-  Isiqlanma sehifenin harasinda olursa olsun taplir -- scroll lazim deyil,
-  cunki Find in page ozu oraya surusdurur.
+AXIN (hamisi insan kimi, OS seviyyesinde real toxunusla):
+  1) Brave acilir, UNVAN SETRINE sorgu YAZILIR ve Enter basilir.
+     Sert: telefonun default axtarisi Google olmalidir (Brave-de default
+     "Brave Search"-dur) -> bir defe: scripts/set_google_search.py <serial>
+  2) Netice sehifesi SURUSDURULUR; her addimda UI agaci oxunur ve
+     "https://azstudy.az" setri EKRANA DUSENDE ona toxunulur.
+  3) Saytda gezilir; daxili sehifelere SEHIFEDEKI LINKE toxunmaqla kecilir
+     (eyni tabda qalir + referrer yaranir). Link tutulmasa ehtiyat olaraq
+     intent islenir.
+  4) Sonda izler ve tablar bir gedisde temizlenir, ucus rejimi 3 saniye
+     yandirilib sondurulur (mobil datada bu, public IP-ni firladir).
+
+  KOHNE USUL (2026-09-07-de silindi): netice Brave-in "Find in page"
+  funksiyasi ile taplirdi -- menyu, yazma, NARINCI isiqlanmanin ekran
+  seklinden piksel-piksel axtarilmasi. Uc ayri asililigi vardi (menyu
+  setrinin dili, tema rengi, ekran sekli sureti) ve her ucu problem cixardi.
+
+  PLATFORMA MEHDUDIYYETI (olculub): Brave-in elcatanliq agaci ekrandan
+  KENARDAKI veb elementlerin heqiqi koordinatini vermir -- hamisini eyni
+  serhed qiymetine yapisdirir (bu telefonda y=2079). Ona gore elementi
+  "gorub ona teref surusdurmek" MUMKUN DEYIL; yalniz ekrana DUSENI tutmaq
+  olar. Bu, daxili link kecidlerinin niye her defe alinmadigini izah edir.
 
 Istifade:
     source scripts/env.sh
@@ -379,6 +394,62 @@ def find_more_button(png_path):
     return (w // 2, (b[0] + b[-1]) // 2)
 
 
+def search_by_typing(adb, serial, tag, query):
+    """
+    Brave-i acir, UNVAN SETRINE toxunur, sorgunu YAZIR ve Enter basir.
+    Qaytarir: Google neticeleri acildisa True.
+
+    NIYE (2026-09-07): evvel hazir Google URL-i intentle acilirdi
+    (`am start -d "google.com/search?q=..."`) -- yeni axtaris qutusu ile hec
+    bir temas olmurdu. Bu, butun axinda insan davranisindan en cox ferqlenen
+    addim idi: real istifadeci brauzeri acir, yazir, Enter basir.
+
+    SERT: Brave-in default axtaris sistemi GOOGLE olmalidir. Brave-de default
+    "Brave Search"-dur (olculub) -- o halda yazilan sorgu search.brave.com-a
+    gedir ve is menasini itirir. Telefon qurulanda BIR DEFE:
+        $PY scripts/set_google_search.py <serial>
+
+    QEYD: `adb input text` yalniz ASCII yaza bilir (ç, ə, ı islemir);
+    default sorgu ASCII-dir: "xaricde tehsil azstudy".
+    """
+    log(tag, f"Brave acilir, unvan setrine yazilir: '{query}'")
+    adb_sh(adb, serial, "shell", "monkey", "-p", BRAVE_PKG,
+           "-c", "android.intent.category.LAUNCHER", "1")
+    time.sleep(random.uniform(4, 6))
+
+    # Unvan setri: yuklenmis sehifede `url_bar`, yeni tab ekraninda
+    # `search_box_text` olur -- ikisini de qebul edirik.
+    bar = None
+    for _ in range(4):
+        xml = ui_dump(adb, serial)
+        bar = node_center(xml, r'resource-id="[^"]*id/(url_bar|search_box_text)"')
+        if bar:
+            break
+        time.sleep(1.5)
+    if not bar:
+        log(tag, "   (unvan setri tapilmadi)")
+        return False
+
+    human_tap(adb, serial, *bar)
+    time.sleep(random.uniform(1.2, 2.0))
+    adb_sh(adb, serial, "shell", "input", "text", query.replace(" ", "%s"))
+    time.sleep(random.uniform(0.8, 1.6))
+    adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_ENTER")
+
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        time.sleep(2)
+        u = current_url(adb, serial) or ""
+        if "google." in u and "search" in u:
+            return True
+        if "search.brave.com" in u or "brave.com/search" in u:
+            log(tag, "   XEBERDARLIQ: sorgu Brave Search-e getdi -- bu telefonda "
+                     "default axtaris Google deyil "
+                     "(bir defe: $PY scripts/set_google_search.py <serial>)")
+            return False
+    return False
+
+
 def find_result_by_scroll(adb, serial, size, tag, max_scrolls=14):
     """
     Google neticelerinde azstudy.az-i SEHIFENI SURUSDUREREK tapir.
@@ -618,10 +689,9 @@ def click_internal_link(adb, serial, size, tag):
     before = current_url(adb, serial) or ""
     y_lo, y_hi = h * 0.15, h * 0.88       # ekranin "toxunula bilen" zolagi
 
-    def find_links(xml):
-        """Uzun basliqli klik oluna bilen node-lar: [(metn, x, y), ...].
-        Ekranda gorunub-gorunmemesine BAXMIR -- agac ekrandan kenardakilari da
-        gosterir, biz onlari sonra surusdurub ekrana getiririk."""
+    def find_links(xml, min_len=25):
+        """Klik oluna bilen metnli node-lar: [(metn, x, y), ...].
+        Ekranda gorunub-gorunmemesine BAXMIR -- filtri cagiran teref edir."""
         out = []
         for chunk in xml.split("<node")[1:]:
             if 'clickable="true"' not in chunk:
@@ -631,8 +701,7 @@ def click_internal_link(adb, serial, size, tag):
             if not t or not b:
                 continue
             txt = t.group(1).strip()
-            # Meqale linkleri uzun olur; qisa metnler menyu/muellif/duymedir.
-            if len(txt) < 25:
+            if len(txt) < min_len:
                 continue
             x1, y1, x2, y2 = map(int, b.groups())
             out.append((txt, (x1 + x2) // 2, (y1 + y2) // 2))
@@ -664,19 +733,37 @@ def click_internal_link(adb, serial, size, tag):
         log(tag, "   (sehifede uygun link tapilmadi)")
         return False
 
-    # 2) EKRANDA GORUNEN linkden birini sec.
+    # 2) EKRANDA GORUNEN link tapilana qeder SURUSDUR.
     #
-    #    BURADA BIR SINAQ EDILDI VE GERI QAYTARILDI: agac ekrandan kenardaki
-    #    linkleri de gosterdiyi ucun "hedefi sec, sonra onu surusdurub ekrana
-    #    getir" usulu yazilmisdi. Olcu onu redd etdi -- kenardaki node-larin
-    #    y qiymetleri surusdurmeye gozlenilen kimi reaksiya vermir, 8 cehd
-    #    bosa gedirdi ve ~50 saniye (gezinti budcesinin yarisi) itirdi:
-    #    dovrde 2 kecid evezine 1 kecid qalirdi.
-    #    Sade usul olculerde daha yaxsidir: gorunen link varsa ona toxun,
-    #    yoxdursa bir-iki defe surusdurub yeniden bax, yene yoxdursa
-    #    ehtiyat yola (intent) buraх.
+    #    NIYE BELE: Android ekrandan KENARDAKI veb node-larin heqiqi
+    #    koordinatini vermir -- hamisini eyni serhed qiymetine yapisdirir
+    #    (bu telefonda y=2079). Ona gore "hedefi sec, sonra ona teref
+    #    surusdur" usulu prinsipce ISLEMIR (sinandi, geri qaytarildi).
+    #    Isleyen yeganne yol: link EKRANA DUSENE qeder surusdurmek --
+    #    find_result_by_scroll-da eyni usul isleyir.
+    #
+    #    Evvel cemi 2 defe surusdurulurdu ve kecidlerin YARISI itirdi
+    #    (olculub). Meqale sehifesi uzundur: oxsar yazilar, kateqoriya
+    #    linkleri ve altliq asagidadir -- oraya catmaq ucun daha cox
+    #    surusdurme lazimdir. Bu, hem de real oxucu davranisidir.
+    #    HEDD MERHELELIDIR. Evvel her zaman 25+ herf teleb olunurdu ve 10
+    #    surusdurmeden sonra da "ekranda link yoxdur" cixirdi -- halbuki
+    #    ekranda linkler VAR idi: sehifenin altina catmisdiq, oradaki altliq
+    #    ve kateqoriya linkleri ise QISADIR ("Haqqımızda", "Əlaqə") ve uzun
+    #    heddle ozumuz onlari kenarlasdirirdiq.
+    #    Indi evvel meqale basliqlari axtarilir, tapilmasa hedd asagi dusur.
+    #    CEHD SAYI QESDEN AZDIR (3). Daha cox surusdurme SINANDI ve geri
+    #    qaytarildi: 6 ve 10 cehd ikinci kecidi xilas etmedi (sebeb asagida),
+    #    amma isi 330 saniyelik limite catdirib gozetciye oldurtdu.
+    #    Yuxari surusdurme de sinandi -- netice deyismedi.
+    #
+    #    SEBEB (olculub): Brave-in elcatanliq agaci ekrandan KENARDAKI veb
+    #    elementlerin heqiqi koordinatini vermir, hamisini y=2079-a yapisdirir.
+    #    Ona gore linki "gorub ona teref getmek" MUMKUN DEYIL -- yalniz
+    #    tesaduf ekrana dusenler tutulur. Bu, kodun deyil, platformanin
+    #    mehdudiyyetidir; daha cox cehd yalniz vaxt yeyir.
     visible = [l for l in links if y_lo <= l[2] <= y_hi]
-    for _ in range(2):
+    for i in range(3):
         if visible:
             break
         swipe(down=True)
@@ -684,63 +771,73 @@ def click_internal_link(adb, serial, size, tag):
         if xml.count("<node") == 0:
             time.sleep(1.5)
             continue
-        links = find_links(xml)
+        links = find_links(xml, 25 if i < 1 else 10)
         visible = [l for l in links if y_lo <= l[2] <= y_hi]
 
     if not visible:
-        log(tag, f"   (ekranda link yoxdur; agacda {len(links)} link var, hamisi kenarda)")
+        log(tag, f"   (3 surusdurmeden sonra da ekranda link yoxdur; "
+                 f"agacda {len(links)} link var)")
         return False
 
-    target, x, y = random.choice(visible)
-
-    log(tag, f"-> linke toxunulur: {target[:55]}")
-    human_tap(adb, serial, x, y)
-
-    # KECIDI GOZLE. Evvel sabit 5-8 saniye gozlenilirdi; mobil datada agir
-    # sehife bu muddete acilmirdi, URL kohne qalirdi ve bot "link deyilmis"
-    # qerari verib intente kecirdi (olculub: her isde ikinci kecid bele itirdi).
-    # Indi URL DEYISENE qeder gozlenilir.
-    time.sleep(3)
-    deadline = time.time() + 15
-    while time.time() < deadline:
-        cur = current_url(adb, serial) or ""
-        if cur and cur != before:
-            break
-        time.sleep(2)
-
-    dismiss_popups(adb, serial, tag)
-
-    # UNVANI OXU. Panel gizli ola biler (sehifeni asagi surusdurende yigilir),
-    # o halda current_url BOS qaytarir. Evvel bos deyer "kenar sayta cixdi" kimi
-    # basa dusulurdu ve bot NAHAQ YERE geri qayidirdi -- bir dovrde butun
-    # kecidler bu sebebden pozuldu. Bos deyer "namelum"dur, "kenar" deyil.
-    after = ""
+    # 3) NAMIZEDLERI BIR-BIR SINA.
+    #    Evvel bir namized secilirdi ve alinmasa derhal el cekilirdi. Amma
+    #    `clickable="true"` olan HER node esl link deyil -- karusel/konteyner
+    #    ola biler (olculub: "URL deyismedi ... link deyilmis"). Real oxucu da
+    #    bele halda basqa linke kecir, ona gore uc namizede qeder sinanilir.
+    tried = set()
     for _ in range(3):
-        after = current_url(adb, serial) or ""
-        if after:
+        cands = [l for l in visible if l[0] not in tried]
+        if not cands:
             break
-        # kicik geri-surusdurme unvan setrini uze cixarir
-        adb_sh(adb, serial, "shell", "input", "swipe",
-               str(w // 2), str(int(h * 0.35)), str(w // 2), str(int(h * 0.60)), "300")
-        time.sleep(1.4)
+        target, x, y = random.choice(cands)
+        tried.add(target)
 
-    if after and SITE_HOST not in after:
-        # Yalniz unvani HEQIQETEN oxuyub kenar sayt gordukde geri qayidiriq.
-        log(tag, f"   (kenar sehife: {after} -- geri qayidilir)")
-        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
-        time.sleep(random.uniform(3, 5))
-        return False
+        log(tag, f"-> linke toxunulur: {target[:55]}")
+        human_tap(adb, serial, x, y)
 
-    if after and before and after == before:
-        # Sehife deyismedi -- toxundugumuz element link deyilmis (mes. konteyner).
-        # Bu setir ELAVE EDILIB: evvel burada sessizce False qaytarilirdi ve
-        # log-da yalniz "(link tapilmadi) intentle" gorunurdu -- sebebi
-        # ayird etmek mumkun olmurdu.
-        log(tag, f"   (URL deyismedi: {after} -- link deyilmis)")
-        return False
+        # KECIDI GOZLE. Evvel sabit 5-8 saniye gozlenilirdi; mobil datada agir
+        # sehife bu muddete acilmirdi, URL kohne qalirdi ve bot "link deyilmis"
+        # qerari verirdi. Indi URL DEYISENE qeder gozlenilir.
+        time.sleep(3)
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            cur = current_url(adb, serial) or ""
+            if cur and cur != before:
+                break
+            time.sleep(2)
 
-    log(tag, f"   daxili sehife: {after or '(unvan oxunmadi)'}")
-    return True
+        dismiss_popups(adb, serial, tag)
+
+        # UNVANI OXU. Panel gizli ola biler (sehifeni asagi surusdurende
+        # yigilir), o halda current_url BOS qaytarir. Bos deyer "namelum"dur,
+        # "kenar sayt" DEYIL -- evvel bele basa dusulurdu ve bot nahaq yere
+        # geri qayidib butun kecidleri pozurdu.
+        after = ""
+        for _ in range(3):
+            after = current_url(adb, serial) or ""
+            if after:
+                break
+            adb_sh(adb, serial, "shell", "input", "swipe",
+                   str(w // 2), str(int(h * 0.35)), str(w // 2), str(int(h * 0.60)), "300")
+            time.sleep(1.4)
+
+        if after and SITE_HOST not in after:
+            log(tag, f"   (kenar sehife: {after} -- geri qayidilir)")
+            adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(random.uniform(3, 5))
+        elif after and before and after == before:
+            log(tag, "   (URL deyismedi -- link deyilmis, basqasi sinanilir)")
+        else:
+            log(tag, f"   daxili sehife: {after or '(unvan oxunmadi)'}")
+            return True
+
+        # Ugursuz cehdden sonra ekran deyismis ola biler -- namizedleri
+        # yeniden oxuyuruq.
+        xml = ui_dump(adb, serial)
+        if xml.count("<node"):
+            visible = [l for l in find_links(xml, 10) if y_lo <= l[2] <= y_hi]
+
+    return False
 
 
 def browse_site(adb, serial, size, tag, total_secs):
@@ -843,10 +940,14 @@ def main():
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
     adb_sh(adb, serial, "shell", "wm", "dismiss-keyguard")
 
+    # Hazir URL yalniz EHTIYAT ucun saxlanilir: esas yol sorgunu unvan setrine
+    # YAZMAQDIR (insan kimi). Yazmaq alinmasa is dayanmasin deye kohne usula
+    # kecirik -- ve bunu loga yaziriq ki, ne qeder tez-tez oldugu gorunsun.
     url = f"https://www.google.com/search?q={quote_plus(args.query)}"
-    log(tag, f"Brave acilir, axtarilir: '{args.query}'")
-    open_url(adb, serial, BRAVE_PKG, url)
-    time.sleep(random.uniform(9, 12))
+    if not search_by_typing(adb, serial, tag, args.query):
+        log(tag, "   (yazmaqla axtaris alinmadi -- hazir URL ile davam edilir)")
+        open_url(adb, serial, BRAVE_PKG, url)
+        time.sleep(random.uniform(9, 12))
 
     cur = current_url(adb, serial)
     if "/sorry" in cur or "recaptcha" in cur.lower():

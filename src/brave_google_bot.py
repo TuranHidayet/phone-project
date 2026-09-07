@@ -342,6 +342,7 @@ def clear_browsing_data(adb, serial, tag, close_tabs=True):
     tablar elə burada baglanir -- ayrica tab gedisine ehtiyac qalmir.
     """
     log(tag, "Brauzer izleri temizlenir (tarixce+kuki+kes, All time)...")
+    _t0 = time.time()      # temizliyin heqiqi qiymetini bilmek ucun (loga yazilir)
 
     # Menyu duymesini uze cixart.
     #
@@ -443,7 +444,8 @@ def clear_browsing_data(adb, serial, tag, close_tabs=True):
     # History sehifesinden tab-a geri qayit
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
     time.sleep(1.1)
-    log(tag, "   izler + tablar temizlendi 🧹" if close_tabs else "   izler temizlendi 🧹")
+    log(tag, ("   izler + tablar temizlendi 🧹" if close_tabs else "   izler temizlendi 🧹")
+             + f" ({time.time() - _t0:.0f} san)")
     return True
 
 
