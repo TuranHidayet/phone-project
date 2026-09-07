@@ -23,11 +23,16 @@ AXIN (hamisi insan kimi, OS seviyyesinde real toxunusla):
   seklinden piksel-piksel axtarilmasi. Uc ayri asililigi vardi (menyu
   setrinin dili, tema rengi, ekran sekli sureti) ve her ucu problem cixardi.
 
-  PLATFORMA MEHDUDIYYETI (olculub): Brave-in elcatanliq agaci ekrandan
-  KENARDAKI veb elementlerin heqiqi koordinatini vermir -- hamisini eyni
-  serhed qiymetine yapisdirir (bu telefonda y=2079). Ona gore elementi
-  "gorub ona teref surusdurmek" MUMKUN DEYIL; yalniz ekrana DUSENI tutmaq
-  olar. Bu, daxili link kecidlerinin niye her defe alinmadigini izah edir.
+  ELCATANLIQ AGACI HAQQINDA IKI TAPINTI (olculub 2026-09-07):
+   1) Veb mezmunu `clickable="true"` ILE ISARELENMIR. Klikli gorunen node-lar
+      ayri destedir (nav/konteyner) ve onlarin koordinatlari HEMISE ekrandan
+      kenara yapisdirilmis qalir (y=2079) -- 25 surusdurmeden sonra da ekrana
+      dusmurler. Meqale linkleri ise adi METN node-udur.
+   2) Ona gore link axtaranda `clickable` YOXLANMIR: ekranda gorunen metn
+      node-lari goturulur (onlar heqiqi koordinat verir), esl link olub-olmadigi
+      ise TOXUNANDAN SONRA URL-in deyismesine gore yoxlanilir.
+  Uzun muddet kod `clickable="true"` teleb edirdi ve mehz buna gore daxili
+  kecidlerin yarisi itirdi.
 
 Istifade:
     source scripts/env.sh
@@ -686,35 +691,76 @@ def click_internal_link(adb, serial, size, tag):
     Qaytarir: kecid alindisa True.
     """
     w, h = size
-    before = current_url(adb, serial) or ""
     y_lo, y_hi = h * 0.15, h * 0.88       # ekranin "toxunula bilen" zolagi
 
-    def find_links(xml, min_len=25):
-        """Klik oluna bilen metnli node-lar: [(metn, x, y), ...].
-        Ekranda gorunub-gorunmemesine BAXMIR -- filtri cagiran teref edir."""
+    # BASLANGIC UNVANI ETIBARLI OXUNMALIDIR. Sehifeni asagi surusdurende
+    # unvan paneli gizlenir ve current_url BOS qaytarir. Bos "before" ile
+    # "sehife deyismedi" yoxlamasi ISLEMIR: bot mətnə toxunub hec yere
+    # kecmediyi halda bunu UGUR sayirdi (olculub -- log-da eyni URL iki defe
+    # "daxili sehife" kimi yazilmisdi). Ona gore panel uze cixarilir.
+    before = ""
+    for _ in range(3):
+        before = current_url(adb, serial) or ""
+        if before:
+            break
+        adb_sh(adb, serial, "shell", "input", "swipe",
+               str(w // 2), str(int(h * 0.35)), str(w // 2), str(int(h * 0.60)), "300")
+        time.sleep(1.2)
+
+    # Linke OXSAMAYAN gorunen metnler (altliqda olurlar) -- bosuna toxunmayaq.
+    not_link = re.compile(
+        r"@|VÖEN|\+994|^\d|WhatsApp$|^Menu$|^Axtar$|Back to top", re.IGNORECASE)
+
+    def find_links(xml, min_len=20):
+        """
+        EKRANDA gorunen, linke oxsayan metn node-lari: [(metn, x, y), ...].
+
+        VACIB TAPINTI (olculub 2026-09-07): bu Brave build-inde veb mezmunu
+        `clickable="true"` ILE ISARELENMIR. Klikli gorunen node-lar tamamile
+        AYRI destedir (nav/konteyner) ve onlarin koordinatlari her zaman
+        ekrandan kenara "yapisdirilmis" qalir -- 25 surusdurmeden sonra da
+        ekrana dusmurler. Kod ise mehz `clickable="true"` teleb edirdi, yeni
+        DUZGUN node-lari ozu kenarlasdirirdi; daxili kecidlerin yarisinin
+        itmesinin esl sebebi bu idi.
+
+        Meqale linkleri (oxsar yazilar bolmesi) adi METN node-udur ve ekrana
+        dusende HEQIQI koordinat verir -- olculub:
+            klik=False (559,542) "Polşada Bakalavr Təhsili Almaq – ..."
+        Ona gore burada `clickable` yoxlanilmir. Metnin esl link olub-olmadigi
+        TOXUNANDAN SONRA URL-e gore yoxlanilir (uc namized sinanilir).
+        """
         out = []
         for chunk in xml.split("<node")[1:]:
-            if 'clickable="true"' not in chunk:
-                continue
             t = re.search(r'text="([^"]+)"', chunk)
             b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
             if not t or not b:
                 continue
             txt = t.group(1).strip()
-            if len(txt) < min_len:
+            # UST HEDD: link basliqlari teqriben 30-90 herfdir, meqale
+            # ABZASLARI ise 100+ olur. Ust hedd olmayanda bot abzasa toxunurdu
+            # (olculub: "Avropa ilə Yaxın Şərqi birləşdirən Türkiyə, güclü
+            # mədən..." -- link deyil, metndir).
+            if not (min_len <= len(txt) <= 95) or not_link.search(txt):
                 continue
             x1, y1, x2, y2 = map(int, b.groups())
             out.append((txt, (x1 + x2) // 2, (y1 + y2) // 2))
         return out
 
-    def swipe(down):
-        """Istiqametli tek swipe. touch_scroll insan kimi gezinti ucundur --
-        istiqameti qarisiq olur, hedefi ekrana getirmek ucun yaramir."""
+    def swipe(down=True):
+        """
+        Istiqametli swipe. touch_scroll insan kimi gezinti ucundur --
+        istiqameti qarisiq olur, mueyyen yere catmaq ucun yaramir.
+
+        SURETLI VE UZUN: meqale linkleri (oxsar yazilar) sehifenin ALTINDADIR;
+        olculub ki, yumsaq surusdurmelerle 8 addimda ora catmaq olmur, sert
+        surusdurme ile ise ~25 addima catilir. Ona gore yol uzun (0.80->0.20),
+        muddet qisadir.
+        """
         x = int(w * random.uniform(0.45, 0.55))
-        y1, y2 = (int(h * 0.75), int(h * 0.30)) if down else (int(h * 0.30), int(h * 0.75))
+        y1, y2 = (int(h * 0.80), int(h * 0.20)) if down else (int(h * 0.20), int(h * 0.80))
         adb_sh(adb, serial, "shell", "input", "swipe", str(x), str(y1), str(x), str(y2),
-               str(random.randint(250, 450)))
-        time.sleep(random.uniform(0.9, 1.5))
+               str(random.randint(180, 260)))
+        time.sleep(random.uniform(0.5, 0.9))
 
     # 1) LINKLERI TAP. Agac bos gelerse (uiautomator sehife yuklenerken bezen
     #    "idle" halina catmir) surusdurmek kome etmir -- gozleyib tekrar oxuyuruq.
@@ -763,7 +809,7 @@ def click_internal_link(adb, serial, size, tag):
     #    tesaduf ekrana dusenler tutulur. Bu, kodun deyil, platformanin
     #    mehdudiyyetidir; daha cox cehd yalniz vaxt yeyir.
     visible = [l for l in links if y_lo <= l[2] <= y_hi]
-    for i in range(3):
+    for i in range(8):
         if visible:
             break
         swipe(down=True)
@@ -771,11 +817,11 @@ def click_internal_link(adb, serial, size, tag):
         if xml.count("<node") == 0:
             time.sleep(1.5)
             continue
-        links = find_links(xml, 25 if i < 1 else 10)
+        links = find_links(xml, 20)
         visible = [l for l in links if y_lo <= l[2] <= y_hi]
 
     if not visible:
-        log(tag, f"   (3 surusdurmeden sonra da ekranda link yoxdur; "
+        log(tag, f"   (8 surusdurmeden sonra da ekranda link yoxdur; "
                  f"agacda {len(links)} link var)")
         return False
 
