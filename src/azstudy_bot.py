@@ -36,7 +36,7 @@ from android_chrome_bot import (
 )
 from brave_google_bot import (
     BRAVE_PKG, screencap, current_url, ui_dump, node_center, human_tap,
-    open_url, close_bot_tab, clear_browsing_data,
+    open_url, close_all_tabs, clear_browsing_data,
 )
 import stats
 import notify
@@ -442,6 +442,26 @@ def stable_highlight(adb, serial, size, shot, tag):
     return prev
 
 
+def wait_for_route(adb, serial, timeout=25):
+    """
+    Telefonda INTERNET MARSRUTU berpa olunana qeder gozleyir.
+
+    `ip route get 8.8.8.8` cavabinda " dev <interfeys>" olanda sebeke hazirdir.
+    Wi-Fi ucun bu wlan0, mobil data ucun ccmni0/rmnet olur -- ferqi yoxdur,
+    yalniz marsrutun MOVCUDLUGU vacibdir.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            out = adb_sh(adb, serial, "shell", "ip route get 8.8.8.8")
+            if " dev " in (out or ""):
+                return True
+        except Exception:
+            pass
+        time.sleep(2)
+    return False
+
+
 def airplane_cycle(adb, serial, tag, secs=3):
     """
     Isin sonunda ucus rejimini YANDIRIB-SONDURUR (sebeke qosulmasi sifirlanir).
@@ -488,8 +508,17 @@ def airplane_cycle(adb, serial, tag, secs=3):
                                    capture_output=True, text=True,
                                    timeout=8).stdout.strip()
             if state == "device":
-                log(tag, "   sebeke qayitdi ✅")
-                return True
+                # adb elaqesi var -- amma bu, INTERNETIN qayitdigi demek DEYIL.
+                # Telefon USB-de olanda (mobil data rejimi) ucus rejimi adb-ye
+                # umumiyyetle toxunmur: "device" cavabi derhal gelir ve bot
+                # sebekenin qayitdigini ZENN EDIRDI. Mobil datada ise LTE-ye
+                # yeniden qosulma bir nece saniye cekir, novbeti is sebekesiz
+                # baslaya bilerdi. Ona gore DEFAULT MARSRUT yoxlanilir.
+                if wait_for_route(adb, serial):
+                    log(tag, "   sebeke qayitdi ✅")
+                    return True
+                log(tag, "   (adb var, amma internet marsrutu qayitmadi)")
+                return False
         except Exception:
             pass                          # timeout / adb xetasi -- normaldir
         time.sleep(3)
@@ -510,6 +539,154 @@ def dismiss_popups(adb, serial, tag):
             log(tag, "   (translate teklifi baglandi)")
 
 
+def click_internal_link(adb, serial, size, tag):
+    """
+    Sehifede gorunen DAXILI linklerden birine TESADUFI secib REAL TOXUNUSLA kecir.
+
+    NIYE INTENT DEYIL (2026-09-07): evvel daxili sehifeler `am start` intenti ile
+    acilirdi. Iki problemi vardi:
+      1) Brave her intenti YENI TAB-da acir -- bir isde 4 tab yigilirdi.
+         (open_url-daki `application_id` extra-si kohne AOSP Browser davranisidir;
+          muasir Chromium onu etibarli saymir.)
+      2) Intentle acilan sehifenin REFERRER-i olmur -- saytda 3 ayri "birbasa
+         giris" kimi gorunur, halbuki bir seansda daxili klikler gorunmelidir.
+    Linke toxunanda hem EYNI TABDA qalir, hem de referrer zenciri yaranir.
+
+    QEYD: bu Brave build-i veb mezmununu uiautomator agacinda gosterir
+    (olculub: sehifede 13 klik oluna bilen link) -- faylin basindaki kohne
+    "veb mezmunu gorunmur" qeydi bu versiyaya aid deyil.
+
+    Qaytarir: kecid alindisa True.
+    """
+    w, h = size
+    before = current_url(adb, serial) or ""
+    y_lo, y_hi = h * 0.15, h * 0.88       # ekranin "toxunula bilen" zolagi
+
+    def find_links(xml):
+        """Uzun basliqli klik oluna bilen node-lar: [(metn, x, y), ...].
+        Ekranda gorunub-gorunmemesine BAXMIR -- agac ekrandan kenardakilari da
+        gosterir, biz onlari sonra surusdurub ekrana getiririk."""
+        out = []
+        for chunk in xml.split("<node")[1:]:
+            if 'clickable="true"' not in chunk:
+                continue
+            t = re.search(r'text="([^"]+)"', chunk)
+            b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
+            if not t or not b:
+                continue
+            txt = t.group(1).strip()
+            # Meqale linkleri uzun olur; qisa metnler menyu/muellif/duymedir.
+            if len(txt) < 25:
+                continue
+            x1, y1, x2, y2 = map(int, b.groups())
+            out.append((txt, (x1 + x2) // 2, (y1 + y2) // 2))
+        return out
+
+    def swipe(down):
+        """Istiqametli tek swipe. touch_scroll insan kimi gezinti ucundur --
+        istiqameti qarisiq olur, hedefi ekrana getirmek ucun yaramir."""
+        x = int(w * random.uniform(0.45, 0.55))
+        y1, y2 = (int(h * 0.75), int(h * 0.30)) if down else (int(h * 0.30), int(h * 0.75))
+        adb_sh(adb, serial, "shell", "input", "swipe", str(x), str(y1), str(x), str(y2),
+               str(random.randint(250, 450)))
+        time.sleep(random.uniform(0.9, 1.5))
+
+    # 1) LINKLERI TAP. Agac bos gelerse (uiautomator sehife yuklenerken bezen
+    #    "idle" halina catmir) surusdurmek kome etmir -- gozleyib tekrar oxuyuruq.
+    links = []
+    for attempt in range(4):
+        xml = ui_dump(adb, serial)
+        if xml.count("<node") == 0:
+            time.sleep(2.0)
+            continue
+        links = find_links(xml)
+        if links:
+            break
+        swipe(down=True)
+
+    if not links:
+        log(tag, "   (sehifede uygun link tapilmadi)")
+        return False
+
+    # 2) EKRANDA GORUNEN linkden birini sec.
+    #
+    #    BURADA BIR SINAQ EDILDI VE GERI QAYTARILDI: agac ekrandan kenardaki
+    #    linkleri de gosterdiyi ucun "hedefi sec, sonra onu surusdurub ekrana
+    #    getir" usulu yazilmisdi. Olcu onu redd etdi -- kenardaki node-larin
+    #    y qiymetleri surusdurmeye gozlenilen kimi reaksiya vermir, 8 cehd
+    #    bosa gedirdi ve ~50 saniye (gezinti budcesinin yarisi) itirdi:
+    #    dovrde 2 kecid evezine 1 kecid qalirdi.
+    #    Sade usul olculerde daha yaxsidir: gorunen link varsa ona toxun,
+    #    yoxdursa bir-iki defe surusdurub yeniden bax, yene yoxdursa
+    #    ehtiyat yola (intent) buraх.
+    visible = [l for l in links if y_lo <= l[2] <= y_hi]
+    for _ in range(2):
+        if visible:
+            break
+        swipe(down=True)
+        xml = ui_dump(adb, serial)
+        if xml.count("<node") == 0:
+            time.sleep(1.5)
+            continue
+        links = find_links(xml)
+        visible = [l for l in links if y_lo <= l[2] <= y_hi]
+
+    if not visible:
+        log(tag, f"   (ekranda link yoxdur; agacda {len(links)} link var, hamisi kenarda)")
+        return False
+
+    target, x, y = random.choice(visible)
+
+    log(tag, f"-> linke toxunulur: {target[:55]}")
+    human_tap(adb, serial, x, y)
+
+    # KECIDI GOZLE. Evvel sabit 5-8 saniye gozlenilirdi; mobil datada agir
+    # sehife bu muddete acilmirdi, URL kohne qalirdi ve bot "link deyilmis"
+    # qerari verib intente kecirdi (olculub: her isde ikinci kecid bele itirdi).
+    # Indi URL DEYISENE qeder gozlenilir.
+    time.sleep(3)
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        cur = current_url(adb, serial) or ""
+        if cur and cur != before:
+            break
+        time.sleep(2)
+
+    dismiss_popups(adb, serial, tag)
+
+    # UNVANI OXU. Panel gizli ola biler (sehifeni asagi surusdurende yigilir),
+    # o halda current_url BOS qaytarir. Evvel bos deyer "kenar sayta cixdi" kimi
+    # basa dusulurdu ve bot NAHAQ YERE geri qayidirdi -- bir dovrde butun
+    # kecidler bu sebebden pozuldu. Bos deyer "namelum"dur, "kenar" deyil.
+    after = ""
+    for _ in range(3):
+        after = current_url(adb, serial) or ""
+        if after:
+            break
+        # kicik geri-surusdurme unvan setrini uze cixarir
+        adb_sh(adb, serial, "shell", "input", "swipe",
+               str(w // 2), str(int(h * 0.35)), str(w // 2), str(int(h * 0.60)), "300")
+        time.sleep(1.4)
+
+    if after and SITE_HOST not in after:
+        # Yalniz unvani HEQIQETEN oxuyub kenar sayt gordukde geri qayidiriq.
+        log(tag, f"   (kenar sehife: {after} -- geri qayidilir)")
+        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+        time.sleep(random.uniform(3, 5))
+        return False
+
+    if after and before and after == before:
+        # Sehife deyismedi -- toxundugumuz element link deyilmis (mes. konteyner).
+        # Bu setir ELAVE EDILIB: evvel burada sessizce False qaytarilirdi ve
+        # log-da yalniz "(link tapilmadi) intentle" gorunurdu -- sebebi
+        # ayird etmek mumkun olmurdu.
+        log(tag, f"   (URL deyismedi: {after} -- link deyilmis)")
+        return False
+
+    log(tag, f"   daxili sehife: {after or '(unvan oxunmadi)'}")
+    return True
+
+
 def browse_site(adb, serial, size, tag, total_secs):
     """
     Saytda total_secs qeder gezir: evvel dusdukleri sehifede scroll,
@@ -526,11 +703,17 @@ def browse_site(adb, serial, size, tag, total_secs):
         touch_scroll(adb, serial, size, steps=1)
         time.sleep(random.uniform(1.5, 3.5))
         if page_i < len(marks) and time.time() >= marks[page_i]:
-            nxt = pages[page_i]
-            log(tag, f"-> daxili sehife: {nxt}")
-            open_url(adb, serial, BRAVE_PKG, nxt)
-            time.sleep(random.uniform(5, 7))
-            dismiss_popups(adb, serial, tag)
+            # ESAS YOL: sehifedeki tesadufi daxili linke real toxunus --
+            # eyni tabda qalir ve referrer yaranir.
+            if not click_internal_link(adb, serial, size, tag):
+                # EHTIYAT: gorunen hissede uygun link yoxdursa (mes. sehife
+                # sonunda serh bolmesindeyik) kohne usulla -- intentle -- keciriк.
+                # Bu halda yeni tab acilir, amma gezinti dayanmir.
+                nxt = pages[page_i]
+                log(tag, f"-> (link tapilmadi) intentle: {nxt}")
+                open_url(adb, serial, BRAVE_PKG, nxt)
+                time.sleep(random.uniform(5, 7))
+                dismiss_popups(adb, serial, tag)
             page_i += 1
     log(tag, "Gezinti bitdi.")
 
@@ -694,10 +877,18 @@ def main():
 
     shutil.rmtree(shots, ignore_errors=True)
 
+    # Tablar TEMIZLIKLE EYNI ANDA baglanir ("Delete browsing data" ekranindaki
+    # "Tabs" qutusu) -- evvel bunun ucun ayrica UI gedisi vardi (tab siyahisi ->
+    # menyu -> hamisini bagla), yeni her isde elave dump-lar ve elave vaxt.
+    cleared = False
     if not args.keep_data:
-        clear_browsing_data(adb, serial, tag)
-    if not args.keep_tab:
-        close_bot_tab(adb, serial, BRAVE_PKG, tag)
+        cleared = clear_browsing_data(adb, serial, tag, close_tabs=not args.keep_tab)
+
+    # EHTIYAT: temizlik bas tutmasa (menyu tapilmadi ve s.) tablar da
+    # baglanmamis qalir ve yigilmaga baslayir -- bu hal olculdu. Ona gore
+    # yalniz HEMIN halda ayrica tab gedisi edilir.
+    if not args.keep_tab and not cleared:
+        close_all_tabs(adb, serial, BRAVE_PKG, tag)
 
     secs = time.time() - t_start
     stats.record(serial, prof["model"], prof["android"], args.query,

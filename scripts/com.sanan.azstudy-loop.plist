@@ -28,10 +28,19 @@
 
     <key>EnvironmentVariables</key>
     <dict>
+        <!-- MOBIL DATA REJIMI (2026-09-07): Redmi Note 9 Nar SIM-i ile, Wi-Fi
+             sonulu, kabel uzerinden isleyir. Public IP artiq operatorundur,
+             ona gore botun sonundaki ucus rejimi her isde IP-ni firladir.
+             CYCLE 240: bir is ~220 san cekir, yeni dovre kicik buferle sigir.
+             Data serfi olculur, paket ona gore artirilacaq.
+             Tesviri hesab: ~360 is/gun x ~7 MB = ~2.5 GB/gun = ~74 GB/ay. -->
         <key>CYCLE</key>
         <string>240</string>
+        <!-- PHONES 4 -> 1: hazirda yalniz bir telefon qosuludur ve o, USB-dedir.
+             4 qalsaydi find_phone.sh her dovrde alt sebekeni bosuna tarardi
+             (~20 san). Wi-Fi-li telefon elave olunanda bu deyeri artirmaq lazimdir. -->
         <key>PHONES</key>
-        <string>4</string>
+        <string>1</string>
     </dict>
 
     <key>RunAtLoad</key>

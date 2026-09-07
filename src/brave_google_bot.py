@@ -41,6 +41,18 @@ from android_chrome_bot import (
 
 BRAVE_PKG = "com.brave.browser"
 
+# Tab siyahisi menyusundaki "hamisini bagla" setri TELEFONUN DILINDEDIR.
+# Menyu setirlerinin resource-id-si eynidir (menu_item_text), ona gore
+# metnle secmekden basqa yol yoxdur -- taninan variantlari sadalayiriq.
+# Uygunlasmasa bot avtomatik ehtiyat yola (tab-be-tab baglama) kecir.
+CLOSE_ALL_TABS_LABELS = (
+    "Close all tabs",           # en
+    "Bütün tabları bağla",      # az
+    "Bütün vərəqələri bağla",   # az (alternativ tercume)
+    "Закрыть все вкладки",      # ru
+    "Tüm sekmeleri kapat",      # tr
+)
+
 # Google netice basliginin rengi (olculub: #1558D6)
 LINK_RGB = (21, 88, 214)
 RGB_TOL = 28            # renge dozumluluk
@@ -179,53 +191,101 @@ def open_url(adb, serial, pkg, url):
            "--es", "com.android.browser.application_id", pkg)
 
 
-def close_bot_tab(adb, serial, pkg, tag):
+def close_all_tabs(adb, serial, pkg, tag):
     """
-    Sonda botun tabini baglayir. Once sehife bosaldilir (about:blank) -- beleliklə
-    tab basligi "New tab" olur ve BIZIM tab oldugu birmenali bilinir; istifadecinin
-    oz tablarina toxunulmur.
+    Tab siyahisini acir ve BUTUN aciq tablari baglayir.
+
+    NIYE DEYISDI (2026-09-07): evvel yalniz botun oz bos tabi baglanirdi ve o da
+    `content-desc="Close New tab..."` METNINE gore taplirdi. Bu metn telefonun
+    dilindedir, ona gore tez-tez uygunlasmirdi -- log-da
+    "(bos tabin baglama duymesi tapilmadi -- tab bos qaldi)" yazilib tab qalirdi.
+    Gunler erzinde yigilirdi: Note 9-da 3 tab toplanmisdi.
+
+    Indi her tabin baglama duymesi RESOURCE-ID ile taplir
+    (`...:id/action_button`) -- bu, dilden asili deyil. Telefonlar bota
+    ayrilmis cihazlardir, ona gore butun tablar baglanir, secmeye ehtiyac yoxdur.
     """
-    open_url(adb, serial, pkg, "about:blank")
-
-    # Sehifenin HEQIQETEN bosaldigini gozleyirik. Sabit 2.5 saniye yavas
-    # telefonda catmirdi: tab hele kohne basliqla qalirdi, "bos tab" tapilmirdi
-    # ve tab baglanmadan qalirdi (uzun muddetde yigilir).
-    for _ in range(6):
-        time.sleep(1.2)
-        if "about:blank" in (current_url(adb, serial) or ""):
-            break
-
-    # Switcher bezen birinci cehdde acilmir -- bir nece defe cehd edirik
-    close_btn = None
+    # Alt panel gizli ola biler -- tab siyahisi duymesini uze cixardiriq.
+    sw = None
     for _ in range(3):
-        # alt panel gizlidirse yuxari surusdurub uze cixart
+        xml = ui_dump(adb, serial)
+        sw = node_center(xml, r'resource-id="[^"]*tab_switcher_button"')
+        if sw:
+            break
         adb_sh(adb, serial, "shell", "input", "swipe", "360", "500", "360", "1100", "300")
         time.sleep(1.2)
 
-        xml = ui_dump(adb, serial)
-        sw = node_center(xml, r'resource-id="[^"]*tab_switcher_button"')
-        if not sw:
-            continue
-        human_tap(adb, serial, *sw)
-        time.sleep(2.5)
-
-        xml = ui_dump(adb, serial)
-        # yalniz BOS ("New tab" / "about:blank") tabin baglama duymesi
-        close_btn = node_center(
-            xml, r'content-desc="Close (New tab|about:blank|Yeni tab)[^"]*"')
-        if close_btn:
-            break
-        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
-        time.sleep(1.5)
-
-    if not close_btn:
-        log(tag, "   (bos tabin baglama duymesi tapilmadi -- tab bos qaldi)")
-        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+    if not sw:
+        log(tag, "   (tab siyahisi duymesi tapilmadi -- tablar baglanmadi)")
+        adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_HOME")
         return False
 
-    human_tap(adb, serial, *close_btn)
-    time.sleep(1.5)
-    log(tag, "   tab baglandi 🗙")
+    human_tap(adb, serial, *sw)
+    time.sleep(2.5)
+
+    xml = ui_dump(adb, serial)
+    before = xml.count("id/action_button")
+    if before == 0:
+        log(tag, "   (aciq tab yox idi)")
+    else:
+        # 1-CI YOL: switcher menyusundaki "hamisini bagla". BIR toxunusla bitir --
+        # tablari bir-bir baglayanda siyahi her defe yeniden duzulur ve toxunus
+        # bos yere gede bilir (sinaqda mehz bu oldu: 2 tab baglandi, sonra dayandi).
+        done = False
+        menu = node_center(xml, r'resource-id="[^"]*id/menu_button"')
+        if menu:
+            human_tap(adb, serial, *menu)
+            time.sleep(2.0)
+            mxml = ui_dump(adb, serial)
+            for label in CLOSE_ALL_TABS_LABELS:
+                hit = node_center(mxml, r'text="%s"' % re.escape(label))
+                if hit:
+                    human_tap(adb, serial, *hit)
+                    time.sleep(2.0)
+                    # Tesdiq dialoqu cixarsa -- duyme RESOURCE-ID ile taplir,
+                    # metnden asili olmasin deye.
+                    dxml = ui_dump(adb, serial)
+                    ok = node_center(dxml, r'resource-id="(android:id/button1|[^"]*positive_button)"')
+                    if ok:
+                        human_tap(adb, serial, *ok)
+                        time.sleep(1.5)
+                    done = True
+                    break
+            if not done:
+                # menyu acildi, amma setir tapilmadi -- menyunu bagla
+                adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+                time.sleep(1.2)
+
+        # 2-CI YOL (ehtiyat): her tabin baglama duymesine bir-bir toxun.
+        # Dilden asili deyil (resource-id), amma reflow sebebinden yavas ve
+        # bezen ilisir -- ona gore yalniz menyu yolu alinmayanda islenir.
+        if not done:
+            stuck = 0
+            prev = None
+            for _ in range(30):
+                cur = ui_dump(adb, serial)
+                n = cur.count("id/action_button")
+                if n == 0:
+                    break
+                if prev is not None and n >= prev:
+                    stuck += 1
+                    if stuck >= 2:      # ust-uste iki defe irelileyis yoxdursa dayan
+                        break
+                else:
+                    stuck = 0
+                prev = n
+                btn = node_center(cur, r'resource-id="[^"]*id/action_button"')
+                if not btn:
+                    break
+                human_tap(adb, serial, *btn)
+                time.sleep(1.8)
+
+        after = ui_dump(adb, serial).count("id/action_button")
+        if after == 0:
+            log(tag, f"   {before} tab baglandi 🗙")
+        else:
+            log(tag, f"   {before - after} tab baglandi, {after} tab QALDI ⚠️")
+
     # Tab siyahisi ekranindan CIX: bele qalsa novbeti isde Brave hemin
     # ekranda acilir, orada menyu duymesi olmur ve bot "netice tapilmadi"
     # xetasi verirdi.
@@ -235,17 +295,23 @@ def close_bot_tab(adb, serial, pkg, tag):
     return True
 
 
-def _set_clear_checkboxes(adb, serial, xml):
+def _set_clear_checkboxes(adb, serial, xml, close_tabs=True):
     """
-    "Delete browsing data" ekraninda YALNIZ tarixce+kuki+kes secili qalsin.
-    Tabs / Saved passwords / Autofill / Site settings secilidirse cixarilir --
-    istifadecinin oz melumatlari silinmesin.
+    "Delete browsing data" ekraninda tarixce+kuki+kes (ve istenilse TABS)
+    secili qalsin. Saved passwords / Autofill / Site settings secilidirse
+    cixarilir -- telefonun oz melumatlari silinmesin.
+
+    TABS NIYE BURADA (2026-09-07): evvel tablar AYRICA gedisle baglanirdi
+    (tab siyahisi -> menyu -> hamisini bagla). Bu, her isde elave UI gedisi
+    ve elave uiautomator dump-lari demek idi. Hemin ekranda onsuz da "Tabs"
+    qutusu var -- onu secmekle tablar temizlikle EYNI ANDA baglanir,
+    ikinci gedise ehtiyac qalmir.
     """
     want = {
         "Browsing history": True,
         "Cookies and site data": True,
         "Cached images and files": True,
-        "Tabs": False,
+        "Tabs": close_tabs,
         "Saved passwords": False,
         "Autofill form data": False,
         "Site settings": False,
@@ -265,21 +331,35 @@ def _set_clear_checkboxes(adb, serial, xml):
                     time.sleep(0.7)
 
 
-def clear_browsing_data(adb, serial, tag):
+def clear_browsing_data(adb, serial, tag, close_tabs=True):
     """
     Botun izlerini silir: Menyu -> History -> Delete browsing data ->
-    All time -> Delete data. Yalniz tarixce, kuki ve kes gedir; istifadecinin
-    tablari, parollari, autofill-i toxunulmur. Novbeti isde Google terefinden
-    hec bir evvelki seans gorunmur.
+    All time -> Delete data. Tarixce, kuki ve kes gedir; parollar, autofill ve
+    sayt ayarlari toxunulmur. Novbeti isde Google terefinden hec bir evvelki
+    seans gorunmur.
+
+    close_tabs=True olanda hemin ekranda "Tabs" qutusu da secilir ve BUTUN
+    tablar elə burada baglanir -- ayrica tab gedisine ehtiyac qalmir.
     """
     log(tag, "Brauzer izleri temizlenir (tarixce+kuki+kes, All time)...")
 
-    # alt panel gizlidirse uze cixart
-    adb_sh(adb, serial, "shell", "input", "swipe", "360", "500", "360", "1100", "300")
-    time.sleep(0.9)
+    # Menyu duymesini uze cixart.
+    #
+    # EVVEL: bir defe surusdurulub bir defe oxunurdu. Gezintiden sonra sehife
+    # asagida qalir, alt panel ise gec qalxir -- menyu tapilmayanda temizlik
+    # BUTOVLUKDE atlanirdi ("menyu duymesi tapilmadi"). Tablar da temizlikle
+    # birlikde baglandigi ucun o zaman tab da qalirdi. Indi bir nece defe cehd
+    # edilir: her cehdde yeniden surusdurulub agac tezeden oxunur.
+    menu = None
+    xml = ""
+    for _ in range(4):
+        xml = ui_dump(adb, serial)
+        menu = node_center(xml, r'resource-id="[^"]*id/menu_button"')
+        if menu:
+            break
+        adb_sh(adb, serial, "shell", "input", "swipe", "360", "500", "360", "1100", "300")
+        time.sleep(1.2)
 
-    xml = ui_dump(adb, serial)
-    menu = node_center(xml, r'resource-id="[^"]*id/menu_button"')
     if not menu:
         log(tag, "   (menyu duymesi tapilmadi -- temizlik atlanir)")
         return False
@@ -305,7 +385,7 @@ def clear_browsing_data(adb, serial, tag):
     time.sleep(2.2)
 
     xml = ui_dump(adb, serial)
-    _set_clear_checkboxes(adb, serial, xml)
+    _set_clear_checkboxes(adb, serial, xml, close_tabs)
 
     # Time range -> "All time" (siyahida sonuncu variant).
     #
@@ -363,7 +443,7 @@ def clear_browsing_data(adb, serial, tag):
     # History sehifesinden tab-a geri qayit
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_BACK")
     time.sleep(1.1)
-    log(tag, "   izler temizlendi 🧹")
+    log(tag, "   izler + tablar temizlendi 🧹" if close_tabs else "   izler temizlendi 🧹")
     return True
 
 
@@ -478,10 +558,13 @@ def main():
     else:
         shutil.rmtree(shots, ignore_errors=True)   # muveqqeti sekiller silinir
 
+    # Tablar temizlikle eyni anda baglanir (asagida "Tabs" qutusu).
+    # Temizlik bas tutmasa tablar da qalir -- ehtiyat ucun ayrica gedis.
+    cleared = False
     if not args.keep_data:
-        clear_browsing_data(adb, serial, tag)
-    if not args.keep_tab:
-        close_bot_tab(adb, serial, BRAVE_PKG, tag)
+        cleared = clear_browsing_data(adb, serial, tag, close_tabs=not args.keep_tab)
+    if not args.keep_tab and not cleared:
+        close_all_tabs(adb, serial, BRAVE_PKG, tag)
     log(tag, "Bitdi ✅")
 
 
