@@ -66,6 +66,23 @@ import notify
 SITE_MARK = "https://azstudy.az"   # Instagram neticesindeki "azstudy.az" adi ile qarismasin
 SITE_HOST = "azstudy.az"
 
+# AXTARIS SOZLERI DOVREYE SALINIR (2026-09-16).
+#
+# NIYE: evvel her defe EYNI soz yazilirdi -- "xaricde tehsil azstudy",
+# gunde ~250 defe, 9 gun boyunca eyni operator IP hovuzundan (77.244.x).
+# Google bunu tanidi: 16 sentyabrda CAPTCHA ("unusual traffic") cixmaga
+# basladi -- hemin gun 13 dovr bu sebebden itdi. Eyni sorgunun tekrari
+# butun axindaki EN GUCLU barmaq izi idi.
+#
+# QEYD: `adb input text` yalniz ASCII yazir (ə, ü, ç, ı islemir) --
+# ona gore sozler ASCII yazilisla saxlanilir.
+QUERIES = [
+    "xaricde tehsil azstudy",
+    "turkiyede tehsil azstudy",
+    "azstudy xaricde tehsil",
+    "azstudy turkiyede tehsil",
+]
+
 # Google mobil SERP-in sonundaki "daha cox netice" duymesinin metni
 # QEYD: `adb input text` ASCII-den kenar herfleri (ç, ə, ı) yaza bilmir,
 # ona gore duymenin yalniz ASCII hissesi axtarilir: "Daha çox axtarış" -> "Daha"
@@ -417,6 +434,14 @@ def search_by_typing(adb, serial, tag, query):
     QEYD: `adb input text` yalniz ASCII yaza bilir (ç, ə, ı islemir);
     default sorgu ASCII-dir: "xaricde tehsil azstudy".
     """
+    # `adb input text` ASCII-den kenar herfleri (ə, ü, ç, ı, ö, ş, ğ) YAZA BILMIR --
+    # onlari sessizce atir ve ekrana yarimciq soz dusur ("xaricd thsil").
+    # Ona gore ASCII olmayan sorgu yazilmir: URL usulu ile davam edilir
+    # (orada quote_plus her herfi duzgun kodlayir).
+    if not query.isascii():
+        log(tag, f"   (sorguda ASCII olmayan herf var: '{query}' -- yazmaq evezine URL)")
+        return False
+
     log(tag, f"Brave acilir, unvan setrine yazilir: '{query}'")
     adb_sh(adb, serial, "shell", "monkey", "-p", BRAVE_PKG,
            "-c", "android.intent.category.LAUNCHER", "1")
@@ -919,8 +944,9 @@ def browse_site(adb, serial, size, tag, total_secs):
 
 def main():
     p = argparse.ArgumentParser(description="AzStudy botu (Google -> azstudy.az -> gezinti)")
-    p.add_argument("--query", default="xaricde tehsil azstudy",
-                   help="Google axtaris sozu (default: brend sozu ile -- sayt 1-ci sehifede olur)")
+    p.add_argument("--query", default=None,
+                   help="Google axtaris sozu. Verilmese QUERIES siyahisindan "
+                        "TESADUFI secilir (eyni sozun tekrari CAPTCHA-ya sebeb olurdu)")
     p.add_argument("--stay", type=float, default=90,
                    help="Saytda toplam nece saniye gezsin (default 90)")
     p.add_argument("--udid", help="Cihaz serial / IP:port")
@@ -932,6 +958,10 @@ def main():
     p.add_argument("--keep-data", action="store_true",
                    help="Sonda brauzer izlerini silme (default: silinir)")
     args = p.parse_args()
+    # Soz verilmeyibse her isde ayri soz secilir -- her dovrde eyni sorgunun
+    # getmesi Google terefinden taninan esas numune idi.
+    if not args.query:
+        args.query = random.choice(QUERIES)
 
     adb = find_adb()
     if not adb:
@@ -995,9 +1025,28 @@ def main():
         open_url(adb, serial, BRAVE_PKG, url)
         time.sleep(random.uniform(9, 12))
 
-    cur = current_url(adb, serial)
-    if "/sorry" in cur or "recaptcha" in cur.lower():
-        bail(2, "!! Google bot yoxlamasi (CAPTCHA) cixdi -- dayanilir.")
+    def is_captcha():
+        u = current_url(adb, serial) or ""
+        return "/sorry" in u or "recaptcha" in u.lower()
+
+    # CAPTCHA -> IP-NI FIRLAT VE BIR DEFE YENIDEN CEHD ET.
+    #
+    # Evvel bot burada sadece dayanirdi ve BUTUN DOVR itirdi. Loglar gosterdi
+    # ki, CAPTCHA-dan sonrakı dovr adeten UGURLU olur -- cunki isin sonundaki
+    # ucus rejimi yeni operator IP-si verir. Yeni itirilen dovrun sebebi
+    # CAPTCHA deyil, sadece IP-nin hemin an isarelenmis olmasidir.
+    # Indi eyni is icinde IP firladilir ve bir defe yeniden cehd edilir.
+    if is_captcha():
+        log(tag, "   CAPTCHA cixdi -- IP firladilib yeniden cehd edilir...")
+        airplane_cycle(adb, serial, tag, max(args.airplane, 3))
+        args.query = random.choice(QUERIES)      # sozu de deyisirik
+        if not search_by_typing(adb, serial, tag, args.query):
+            url = f"https://www.google.com/search?q={quote_plus(args.query)}"
+            open_url(adb, serial, BRAVE_PKG, url)
+            time.sleep(random.uniform(9, 12))
+        if is_captcha():
+            bail(2, "!! CAPTCHA cixdi -- IP firlatdiqdan sonra da kecmedi.")
+        log(tag, "   CAPTCHA asildi ✅ (yeni IP + yeni soz)")
 
     # --- azstudy.az-i neticelerde tap: sehife-sehife, "Daha cox netice" basaraq
     after = ""
