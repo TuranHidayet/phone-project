@@ -190,11 +190,17 @@ $fails uğursuz dövrdən sonra bot yenidən normal işləyir."
     el=$(( prev_end - t0 ))
     echo "=== $(date '+%F %T') | dovr #$n bitdi (kod=$rc, ${el} san) ==="
 
-    if [ "$el" -lt "$CYCLE" ]; then
-        w=$(( CYCLE - el ))
-        echo "    novbeti dovre qeder $w san bufer..."
+    # DOVR UZUNLUGU HER DEFE TESADUFIDIR: CYCLE ± 30 saniye.
+    # CYCLE=240 olanda bu, 210-270 saniye (3.5 - 4.5 deqiqe) demekdir.
+    # Evvel her dovr SAAT KIMI eyni 240 saniye idi -- insan trafikinde bele
+    # nizam olmur ve bu, numunenin en asan goruneni idi.
+    target=$(( CYCLE - 30 + RANDOM % 61 ))
+
+    if [ "$el" -lt "$target" ]; then
+        w=$(( target - el ))
+        echo "    novbeti dovre qeder $w san bufer (hedef ${target} san)..."
         sleep "$w"
     else
-        echo "    dovr ${CYCLE} san-dan uzun cekdi -- derhal novbeti dovr"
+        echo "    dovr ${target} san-dan uzun cekdi -- derhal novbeti dovr"
     fi
 done

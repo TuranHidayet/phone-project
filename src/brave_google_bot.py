@@ -168,9 +168,18 @@ def human_tap(adb, serial, x, y):
     Sapma kicik saxlanilir (±7 piksel): bu ekranda bir metn setri ~45-60
     piksel hundurlukdedir, ona gore hedefden kenara cixmir.
     """
-    x = int(x) + random.randint(-7, 7)
-    y = int(y) + random.randint(-7, 7)
-    adb_sh(adb, serial, "shell", "input", "tap", str(x), str(y))
+    # EYNI SAPMA ARDICIL TEKRARLANMIR. Tesadufi secim bezen eyni deyeri
+    # ust-uste verir; tekrarlanan koordinat ise "alqoritm" kimi gorunur.
+    # Ona gore sonuncu sapma yadda saxlanilir ve tekrarlanarsa yeniden secilir.
+    while True:
+        dx, dy = random.randint(-7, 7), random.randint(-7, 7)
+        if (dx, dy) != human_tap.last:
+            break
+    human_tap.last = (dx, dy)
+    adb_sh(adb, serial, "shell", "input", "tap", str(int(x) + dx), str(int(y) + dy))
+
+
+human_tap.last = (None, None)
 
 
 def ui_dump(adb, serial):

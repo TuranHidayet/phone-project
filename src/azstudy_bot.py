@@ -76,11 +76,20 @@ SITE_HOST = "azstudy.az"
 #
 # QEYD: `adb input text` yalniz ASCII yazir (ə, ü, ç, ı islemir) --
 # ona gore sozler ASCII yazilisla saxlanilir.
+# QEYD (2026-09-19): "azstudy ..." ile BASLAYAN variantlar cixarildi.
+# Sebeb SEO-dur: onlar sirf brend sorgusudur, sayt orada onsuz da 1-cidir --
+# yeni siqnal vermir. Deyerli olanlar MOVZU + BREND formasidir
+# ("turkiyede tehsil azstudy"): istifadeci movzunu axtarir, brendi ise
+# deqiqlesdirici kimi elave edir -- bu, real axtaris davranisidir.
 QUERIES = [
     "xaricde tehsil azstudy",
     "turkiyede tehsil azstudy",
-    "azstudy xaricde tehsil",
-    "azstudy turkiyede tehsil",
+    "rusiyada tehsil azstudy",
+    "turkiyede tehsil haqqi azstudy",
+    "rusiyada pulsuz tehsil azstudy",
+    "turkiye universitetleri azstudy",
+    "turkiyede magistr azstudy",
+    "dim turkiye azstudy",
 ]
 
 # Google mobil SERP-in sonundaki "daha cox netice" duymesinin metni
@@ -473,15 +482,25 @@ def search_by_typing(adb, serial, tag, query):
     # Bu, IP-den ve sozden ASILI OLMAYAN birbasa "insan deyil" olcusudur:
     # her yeni IP-den eyni qeyri-insani yazilis gedirdi, ona gore IP firlatmaq
     # CAPTCHA-ni tam saxlamirdi.
+    # RITM DEYISIR: insan bir neçe herfi sürətlə yazir, sonra yavaslayir.
+    # Sabit diapazon (hemise 0.06-0.22) ozu de numune yaradardi -- ona gore
+    # ara-sira "surətli seriya", ara-sira "yavas seriya" olur, ustelik her
+    # herfe ±millisaniye seviyyesinde xirda sapma elave edilir.
+    fast = random.random() < 0.5
     for i, ch in enumerate(query):
         adb_sh(adb, serial, "shell", "input", "text",
                "%s" if ch == " " else ch)
-        # Herfler arasi fasile deyiskendir; ara-sira daha uzun "dusunme"
-        # pauzasi verilir (insan yazarken bele edir).
-        if random.random() < 0.12:
-            time.sleep(random.uniform(0.45, 1.1))
+
+        if random.random() < 0.18:        # ritm deyisir
+            fast = not fast
+        if random.random() < 0.10:        # "dusunme" pauzasi
+            d = random.uniform(0.40, 1.15)
+        elif fast:
+            d = random.uniform(0.045, 0.13)
         else:
-            time.sleep(random.uniform(0.06, 0.22))
+            d = random.uniform(0.14, 0.30)
+        # millisaniye seviyyesinde elave sapma -- iki herf eyni fasile almasin
+        time.sleep(round(d + random.uniform(-0.012, 0.012), 4))
 
     # Yazib bitirenden sonra insan bir az duruxur (neticelere baxir)
     time.sleep(random.uniform(1.0, 2.4))
@@ -938,9 +957,19 @@ def browse_site(adb, serial, size, tag, total_secs):
     sonra 1-2 daxili sehifeye kecib orada da scroll edir.
     """
     t_end = time.time() + total_secs
-    pages = random.sample(SITE_PAGES, k=2)
-    # vaxt 3 hisseye bolunur: dusdukleri sehife + 2 daxili sehife
-    marks = [t_end - total_secs * 2 / 3, t_end - total_secs / 3]
+
+    # NECE DAXILI SEHIFE -- her isde ferqli (1-4).
+    # Evvel HEMISE DEQIQ 2 idi ve eyni SITE_PAGES siyahisindan secilirdi:
+    # her ziyaretin eyni formada olmasi ozu numune idi. Indi say da,
+    # sehifeler de deyisir. Cekiler real oxucuya uygundur -- adeten 2,
+    # bezen 1 ve ya 3, nadiren 4.
+    n_pages = random.choices([1, 2, 3, 4], weights=[20, 40, 28, 12])[0]
+    pages = random.sample(SITE_PAGES, k=min(n_pages, len(SITE_PAGES)))
+
+    # Kecid anlari vaxta BERABER paylanir -- beleliklə sehife sayi deyisse de
+    # umumi gezinti muddeti (total_secs) eyni qalir.
+    marks = [t_end - total_secs * (n_pages - i) / (n_pages + 1)
+             for i in range(n_pages)]
     page_i = 0
 
     log(tag, f"Saytda gezinti baslayir ({total_secs:.0f} san)...")
