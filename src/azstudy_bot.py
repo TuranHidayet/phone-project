@@ -462,8 +462,29 @@ def search_by_typing(adb, serial, tag, query):
 
     human_tap(adb, serial, *bar)
     time.sleep(random.uniform(1.2, 2.0))
-    adb_sh(adb, serial, "shell", "input", "text", query.replace(" ", "%s"))
-    time.sleep(random.uniform(0.8, 1.6))
+
+    # HERF-HERF YAZILIR (2026-09-19).
+    #
+    # Evvel butun sorgu BIR `input text` ile, bir anda yazilirdi. Problem
+    # gorunmez, amma ciddidir: Brave unvan setrine yazdiqca Google-un TEKLIF
+    # (suggest) endpoint-ine sorgu gonderir. Real yazilisda Google ardicilliq
+    # gorur -- "t", "tu", "tur", "turk"... Bizde ise BOSLUQDAN BIRBASA tam
+    # 24 herfli sorguya sicrayis gorunurdu, sonra derhal axtaris.
+    # Bu, IP-den ve sozden ASILI OLMAYAN birbasa "insan deyil" olcusudur:
+    # her yeni IP-den eyni qeyri-insani yazilis gedirdi, ona gore IP firlatmaq
+    # CAPTCHA-ni tam saxlamirdi.
+    for i, ch in enumerate(query):
+        adb_sh(adb, serial, "shell", "input", "text",
+               "%s" if ch == " " else ch)
+        # Herfler arasi fasile deyiskendir; ara-sira daha uzun "dusunme"
+        # pauzasi verilir (insan yazarken bele edir).
+        if random.random() < 0.12:
+            time.sleep(random.uniform(0.45, 1.1))
+        else:
+            time.sleep(random.uniform(0.06, 0.22))
+
+    # Yazib bitirenden sonra insan bir az duruxur (neticelere baxir)
+    time.sleep(random.uniform(1.0, 2.4))
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_ENTER")
 
     deadline = time.time() + 25

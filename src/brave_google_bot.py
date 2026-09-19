@@ -158,7 +158,19 @@ def find_link_bands(png_path, skip_top_frac=0.28):
 
 
 def human_tap(adb, serial, x, y):
-    adb_sh(adb, serial, "shell", "input", "tap", str(int(x)), str(int(y)))
+    """
+    Toxunus -- KICIK TESADUFI SAPMA ile.
+
+    Evvel her defe elementin DEQIQ merkezine, piksel-piksel eyni noqteye
+    toxunulurdu. Real barmaq hec vaxt eyni yere dusmur, Google-un netice
+    sehifesi ise klik koordinatlarini olcur -- eyni noqtenin tekrari
+    "insan deyil" elametidir.
+    Sapma kicik saxlanilir (±7 piksel): bu ekranda bir metn setri ~45-60
+    piksel hundurlukdedir, ona gore hedefden kenara cixmir.
+    """
+    x = int(x) + random.randint(-7, 7)
+    y = int(y) + random.randint(-7, 7)
+    adb_sh(adb, serial, "shell", "input", "tap", str(x), str(y))
 
 
 def ui_dump(adb, serial):
