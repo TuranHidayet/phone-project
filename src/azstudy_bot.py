@@ -553,18 +553,52 @@ def find_result_by_scroll(adb, serial, size, tag, max_scrolls=14):
             time.sleep(1.8)
             continue
 
+        # URL setri ("https://azstudy.az") LOVBERDIR: o, yalniz saytin oz
+        # neticelerinde olur, Instagram/Facebook kartlarinda olmur.
+        # Amma ONA TOXUNMURUQ -- asagiya bax.
+        anchor = None
         for chunk in xml.split("<node")[1:]:
             m = re.search(r'text="([^"]*)"', chunk)
             if not m or SITE_MARK not in m.group(1):
                 continue
             b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
-            if not b:
-                continue
-            x1, y1, x2, y2 = map(int, b.groups())
-            cy = (y1 + y2) // 2
-            if y_lo <= cy <= y_hi:
-                log(tag, f"   netice {i + 1}-ci baxisda ekranda gorundu")
-                return (x1 + x2) // 2, cy
+            if b:
+                x1, y1, x2, y2 = map(int, b.groups())
+                anchor = ((x1 + x2) // 2, (y1 + y2) // 2)
+                break
+
+        if anchor and y_lo <= anchor[1] <= y_hi:
+            # BASLIGA TOXUNURUQ, URL SETRINE YOX (2026-09-19).
+            #
+            # Olculub: netice blokunda URL setri `clickable="false"`, BASLIQ
+            # ise `clickable="true"` -- yeni esl link node-u basliqdir.
+            # Bot URL setrine toxunanda naviqasiya yene bas verir (toxunus ana
+            # linkin sahesine dusur), amma bu, basliga toxunmaqla eyni hadise
+            # olmaya biler.
+            # Kodda URL setrine kecmeyin sebebi yazilmisdi: RENG askarlamasi
+            # islenirdi ve ziyaret olunmus basliqlar benovseyi oldugu ucun
+            # detektor onlari gormurdu. Indi reng yox, UI AGACI islenir --
+            # o sebeb qalmayib.
+            title = None
+            for chunk in xml.split("<node")[1:]:
+                if 'clickable="true"' not in chunk:
+                    continue
+                t = re.search(r'text="([^"]{15,})"', chunk)
+                b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', chunk)
+                if not t or not b:
+                    continue
+                x1, y1, x2, y2 = map(int, b.groups())
+                cy = (y1 + y2) // 2
+                # Basliq URL setrinin BIR QEDER ASAGISINDADIR (eyni netice bloku)
+                if anchor[1] < cy <= anchor[1] + int(h * 0.12) and y_lo <= cy <= y_hi:
+                    title = ((x1 + x2) // 2, cy)
+                    break
+
+            if title:
+                log(tag, f"   netice {i + 1}-ci baxisda gorundu (basliga toxunulur)")
+                return title
+            log(tag, f"   netice {i + 1}-ci baxisda gorundu (basliq tapilmadi, URL setri)")
+            return anchor
 
         # Gorunmedi -- bir addim asagi. Insan kimi: orta suretli tek swipe.
         x = int(w * random.uniform(0.45, 0.55))
