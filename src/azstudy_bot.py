@@ -472,6 +472,17 @@ def search_by_typing(adb, serial, tag, query):
     human_tap(adb, serial, *bar)
     time.sleep(random.uniform(1.2, 2.0))
 
+    # UNVAN SETRINI TEMIZLE. Adeten unvan setrine toxunanda movcud metn tam
+    # secilir ve yazilan onu evez edir -- amma her zaman yox. Secilmeyende
+    # yazdigimiz koəhne metne ELAVE olunur ve sorgu korlanir (olculub:
+    # "türkiyədə xaricde tehsil azstudy" -- birinci soz qaliq idi).
+    # Kursoru sona aparib silirik ki, hansı halda olsa temiz baslayaq.
+    # `input keyevent` bir cagirisda bir nece kod qebul edir -- 60 ayri adb
+    # cagirisi ~9 saniye aparardi, bu ise bir cagirisdir.
+    adb_sh(adb, serial, "shell", "input", "keyevent",
+           "123 " + "67 " * 60)          # 123=MOVE_END, 67=DEL
+    time.sleep(random.uniform(0.4, 0.8))
+
     # HERF-HERF YAZILIR (2026-09-19).
     #
     # Evvel butun sorgu BIR `input text` ile, bir anda yazilirdi. Problem

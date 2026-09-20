@@ -55,11 +55,32 @@ def tap_label(adb, serial, labels, what, tries=3):
     return False
 
 
+# Klaviatura: SwiftKey yazilani DEYISIR, Gboard yox.
+# Olculub (2026-09-21, eyni sozle A/B):
+#     Gboard   -> 'turkiyede '    (yazdigimiz kimi)
+#     SwiftKey -> 'türkiyədə '    (bosluq basilanda lugetden duzeldir)
+# Bot sorgunu ASCII yazir; SwiftKey onu azerbaycan herflerine cevirdiyi ucun
+# Google-a BASQA sorgu gedirdi. SwiftKey-in "Quick prediction insert" acari
+# kilidlidir (toxunusla cevrilmir), ona gore hell klaviaturani deyismekdir.
+GBOARD = "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME"
+
+
+def set_gboard(adb, serial):
+    out = adb_sh(adb, serial, "shell", "ime", "set", GBOARD)
+    cur = adb_sh(adb, serial, "shell", "settings", "get", "secure",
+                 "default_input_method").strip()
+    ok = "latin" in cur
+    print(f"  Klaviatura: {'Gboard teyin edildi ✅' if ok else 'ALINMADI -- ' + cur}")
+    return ok
+
+
 def main():
     serial = sys.argv[1] if len(sys.argv) > 1 else None
     if not serial:
         sys.exit("Istifade: set_google_search.py <serial>")
     adb = find_adb()
+
+    set_gboard(adb, serial)
 
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
     adb_sh(adb, serial, "shell", "wm", "dismiss-keyguard")
