@@ -115,15 +115,17 @@ SITE_PAGES = [
 # ferqli sayt ve ferqli temizlik rejimi ile davranisini olcmek.
 #
 # "clean" acari: hemin hedefde isin sonunda TARIXCE/KUKI silinsinmi.
-#   HER IKISI -> False: istifadeci teleb etdi (2026-09-22) -- kuki ve tarixce
-#   HEC BIR HEDEFDE silinmir, brauzer profil toplasin deye.
+#   HER IKISI -> True. Qisa muddet False sinandi (kuki/tarixce saxlanilsin
+#   deye), sonra geri qaytarildi: olculdu ki, kuki saxlamaq cihazi GIZLETMIR,
+#   eksine birbasa tanidir -- brauzer her sorguda oz kukisi ile ozunu bildirir.
+#   Kuki silinende tanima yalniz barmaq izi ile, yeni dolayi yolla mumkun olur.
 # QEYD: clean=False olanda da TABLAR baglanir -- yigilmasin deye.
 TARGETS = [
     {
         "host": "azstudy.az",
         "mark": "https://azstudy.az",
         "weight": 2,
-        "clean": False,
+        "clean": True,
         "queries": QUERIES,
         "pages": SITE_PAGES,
     },
@@ -131,7 +133,7 @@ TARGETS = [
         "host": "turanly.com",
         "mark": "https://turanly.com",
         "weight": 1,
-        "clean": False,
+        "clean": True,
         # ASCII olmalidir -- `adb input text` ə/ü/ç yaza bilmir.
         "queries": [
             "turan hidayetov",
