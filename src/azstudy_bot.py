@@ -464,6 +464,9 @@ def search_by_typing(adb, serial, tag, query):
         bar = node_center(xml, r'resource-id="[^"]*id/(url_bar|search_box_text)"')
         if bar:
             break
+        # Unvan setrinin tapilmamasi adeten EKRANDA DIALOQ olmasinin
+        # simptomudur -- onu baglayib yeniden baxiriq.
+        dismiss_dialogs(adb, serial, tag, rounds=2)
         time.sleep(1.5)
     if not bar:
         log(tag, "   (unvan setri tapilmadi)")
@@ -766,6 +769,41 @@ def airplane_cycle(adb, serial, tag, secs=3):
         time.sleep(3)
     log(tag, "   (IP deyisib -- novbeti dovrde telefon yeniden tapilacaq)")
     return False
+
+
+def dismiss_dialogs(adb, serial, tag, rounds=3):
+    """
+    Ekranda ILISIB QALMIS dialoqu baglayir (sistem, MIUI, Brave -- ferqi yoxdur).
+
+    NIYE LAZIMDIR (olculub 2026-09-21): gece saat 06:36-da ekrana bir pencere
+    cixib ve bot 5 SAAT ilisib qalib. Loglarda izi aydindir -- doqquz dovr
+    ust-uste `kod=137, ~335 san`, yeni her is gozetci limitine catib
+    oldurulub. Istifadeci seher "OK" basandan sonra is normala qayidib.
+    Gozetci sistemi bloklanmaqdan qorudu, amma pencereni BAGLAYA BILMEDI --
+    cunki onu baglamagi bilmirdi.
+
+    METNE GORE YOX, RESOURCE-ID-ye gore islenir: dialoq duymelerinin id-si
+    Android-de standartdir (`android:id/button1` = musbet duyme) ve
+    TELEFONUN DILINDEN ASILI DEYIL. Metnle axtarsaydiq ("OK", "Allow",
+    "İcazə ver"...) her telefonun dilinde ayri siyahi lazim olardi -- bu
+    layihede bele siyahilar artiq bir nece defe problem cixarib.
+    """
+    for _ in range(rounds):
+        xml = ui_dump(adb, serial)
+        if xml.count("<node") == 0:
+            time.sleep(1.2)
+            continue
+
+        btn = (node_center(xml, r'resource-id="android:id/button1"')        # OK / Allow
+               or node_center(xml, r'resource-id="android:id/button3"')     # neytral
+               or node_center(xml, r'resource-id="[^"]*positive_button"')
+               or node_center(xml, r'resource-id="[^"]*infobar_close_button"'))
+        if not btn:
+            return False
+        human_tap(adb, serial, *btn)
+        time.sleep(1.4)
+        log(tag, "   (ekranda dialoq var idi -- baglandi)")
+    return True
 
 
 def dismiss_popups(adb, serial, tag):
@@ -1110,6 +1148,11 @@ def main():
 
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
     adb_sh(adb, serial, "shell", "wm", "dismiss-keyguard")
+
+    # ISIN EN EVVELINDE ekrani temizle: evvelki isden qalmis ve ya sistemin
+    # cixardigi dialoq varsa baglansin. Bele bir pencere 21.09-da botu
+    # 5 saat saxlamisdi.
+    dismiss_dialogs(adb, serial, tag)
 
     # Hazir URL yalniz EHTIYAT ucun saxlanilir: esas yol sorgunu unvan setrine
     # YAZMAQDIR (insan kimi). Yazmaq alinmasa is dayanmasin deye kohne usula
