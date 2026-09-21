@@ -92,6 +92,7 @@ QUERIES = [
     "dim turkiye azstudy",
 ]
 
+
 # Google mobil SERP-in sonundaki "daha cox netice" duymesinin metni
 # QEYD: `adb input text` ASCII-den kenar herfleri (ç, ə, ı) yaza bilmir,
 # ona gore duymenin yalniz ASCII hissesi axtarilir: "Daha çox axtarış" -> "Daha"
@@ -105,6 +106,46 @@ SITE_PAGES = [
     "https://azstudy.az/rusiyada-tehsil-2025/",
     "https://azstudy.az/rusiyada-pulsuz-tehsil-2025/",
     "https://azstudy.az/dim-turkiye/",
+]
+
+# HEDEF SAYTLAR (2026-09-22). Her isde biri secilir.
+#
+# Evvel bot yalniz azstudy.az-a baglanmisdi. Indi ikinci sayt da var
+# (turanly.com -- istifadecinin sexsi portfoliosu). Meqsed: eyni mexanizmin
+# ferqli sayt ve ferqli temizlik rejimi ile davranisini olcmek.
+#
+# "clean" acari: hemin hedefde isin sonunda TARIXCE/KUKI silinsinmi.
+#   HER IKISI -> False: istifadeci teleb etdi (2026-09-22) -- kuki ve tarixce
+#   HEC BIR HEDEFDE silinmir, brauzer profil toplasin deye.
+# QEYD: clean=False olanda da TABLAR baglanir -- yigilmasin deye.
+TARGETS = [
+    {
+        "host": "azstudy.az",
+        "mark": "https://azstudy.az",
+        "weight": 2,
+        "clean": False,
+        "queries": QUERIES,
+        "pages": SITE_PAGES,
+    },
+    {
+        "host": "turanly.com",
+        "mark": "https://turanly.com",
+        "weight": 1,
+        "clean": False,
+        # ASCII olmalidir -- `adb input text` ə/ü/ç yaza bilmir.
+        "queries": [
+            "turan hidayetov",
+            "turan hidayetov web developer",
+            "turanly",
+        ],
+        "pages": [
+            "https://turanly.com/az/about",
+            "https://turanly.com/az/services",
+            "https://turanly.com/az/work",
+            "https://turanly.com/az/blog",
+            "https://turanly.com/az/contact",
+        ],
+    },
 ]
 
 # Find in page isiqlanmasinin rengi (narinci)
@@ -1093,6 +1134,16 @@ def main():
     args = p.parse_args()
     # Soz verilmeyibse her isde ayri soz secilir -- her dovrde eyni sorgunun
     # getmesi Google terefinden taninan esas numune idi.
+    # HEDEF SAYT SECILIR. Modul seviyyesindeki deyisenler yenilenir ki,
+    # butun funksiyalar (netice axtarisi, kecid yoxlamasi, daxili sehifeler)
+    # hemin hedefe uygun islesin.
+    global SITE_MARK, SITE_HOST, QUERIES, SITE_PAGES
+    target = random.choices(TARGETS, weights=[t["weight"] for t in TARGETS])[0]
+    SITE_MARK = target["mark"]
+    SITE_HOST = target["host"]
+    QUERIES = target["queries"]
+    SITE_PAGES = target["pages"]
+
     if not args.query:
         args.query = random.choice(QUERIES)
 
@@ -1270,7 +1321,14 @@ def main():
     # menyu -> hamisini bagla), yeni her isde elave dump-lar ve elave vaxt.
     cleared = False
     if not args.keep_data:
-        cleared = clear_browsing_data(adb, serial, tag, close_tabs=not args.keep_tab)
+        # HEDEFE GORE: bezi saytlarda tarixce/kuki QESDEN saxlanilir
+        # (target["clean"] = False). Tablar ise her halda baglanir --
+        # asagidaki ehtiyat gedisi onu edir.
+        if target.get("clean", True):
+            cleared = clear_browsing_data(adb, serial, tag,
+                                          close_tabs=not args.keep_tab)
+        else:
+            log(tag, f"   (izler SAXLANILIR -- {SITE_HOST} rejimi)")
 
     # EHTIYAT: temizlik bas tutmasa (menyu tapilmadi ve s.) tablar da
     # baglanmamis qalir ve yigilmaga baslayir -- bu hal olculdu. Ona gore
