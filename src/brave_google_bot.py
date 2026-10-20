@@ -33,6 +33,7 @@ import shutil
 import argparse
 import tempfile
 import subprocess
+import atexit
 from urllib.parse import quote_plus
 
 from android_chrome_bot import (
@@ -53,8 +54,10 @@ CLOSE_ALL_TABS_LABELS = (
     "Tüm sekmeleri kapat",      # tr
 )
 
-# Google netice basliginin rengi (olculub: #1558D6)
-LINK_RGB = (21, 88, 214)
+# Google netice basliginin rengi (light + dark theme)
+# Light: #1558D6 = (21,88,214), Dark: #8AB4F8 = (138,180,248)
+LINK_RGBS = ((21, 88, 214), (138, 180, 248), (168, 199, 250))
+LINK_RGB = LINK_RGBS[0]  # backward compat
 RGB_TOL = 28            # renge dozumluluk
 MIN_ROW_HITS = 18       # setirde en azi bu qeder mavi piksel olsun
 MIN_BAND_H = 18         # zolagin hundurluyu (basliq metni boyukdur)
@@ -111,7 +114,6 @@ def find_link_bands(png_path, skip_top_frac=0.28):
     im = Image.open(png_path).convert("RGB")
     w, h = im.size
     px = im.load()
-    lr, lg, lb = LINK_RGB
     y0 = int(h * skip_top_frac)          # unvan setri / Google basligi atilir
 
     rows = []                            # (y, hits, xmin, xmax)
@@ -119,7 +121,12 @@ def find_link_bands(png_path, skip_top_frac=0.28):
         hits, xmin, xmax = 0, w, 0
         for x in range(8, w - 8, 2):
             r, g, b = px[x, y]
-            if abs(r - lr) < RGB_TOL and abs(g - lg) < RGB_TOL and abs(b - lb) < RGB_TOL:
+            matched = False
+            for lr, lg, lb in LINK_RGBS:
+                if abs(r - lr) < RGB_TOL and abs(g - lg) < RGB_TOL and abs(b - lb) < RGB_TOL:
+                    matched = True
+                    break
+            if matched:
                 hits += 1
                 if x < xmin:
                     xmin = x
@@ -487,6 +494,11 @@ def main():
     p.add_argument("--shots", default=None,
                    help="Ekran sekillerini bu qovluqda SAXLA (default: saxlanmir, "
                         "muveqqeti fayl istifadeden sonra silinir)")
+    p.add_argument("--screen", default=None,
+                   help="Ekran olcusunu deyis, mes. 720x1600 (wm size). "
+                        "Test bitdikden sonra avtomatik reset olunur.")
+    p.add_argument("--only-tabs", action="store_true",
+                   help="Yalnız tabları bağla, tarixçə/kuki/keşi SİLMƏ")
     args = p.parse_args()
 
     adb = find_adb()
@@ -512,7 +524,52 @@ def main():
 
     prof = device_profile(adb, serial)
     tag = prof["model"] or serial
-    size = prof["size"]
+
+    # --screen / --density verilibse ekran çözünürlüyünü dəyiş (test üçün)
+    _orig_size, _orig_density = None, None
+    if args.screen or args.density:
+        import re as _re
+        out = adb_sh(adb, serial, "shell", "wm", "size")
+        # Override size üstünlük təşkil edir (Physical size-dan əvvəl gəlir)
+        mo = _re.search(r"Override size:\s*(\d+)x(\d+)", out)
+        if mo:
+            _orig_size = f"{mo.group(1)}x{mo.group(2)}"
+        else:
+            mp = _re.search(r"Physical size:\s*(\d+)x(\d+)", out)
+            if mp:
+                _orig_size = f"{mp.group(1)}x{mp.group(2)}"
+        out = adb_sh(adb, serial, "shell", "wm", "density")
+        mdo = _re.search(r"Override density:\s*(\d+)", out)
+        if mdo:
+            _orig_density = mdo.group(1)
+        else:
+            md = _re.search(r"(\d+)", out)
+            if md:
+                _orig_density = md.group(1)
+        if args.screen:
+            adb_sh(adb, serial, "shell", "wm", "size", args.screen)
+        if args.density:
+            adb_sh(adb, serial, "shell", "wm", "density", str(args.density))
+        time.sleep(1.5)
+        # Profili yenidən oxu — touch_scroll düzgün ölçü istifadə etməlidir
+        prof = device_profile(adb, serial)
+        size = prof["size"]
+        print(f"[SCREEN] {args.screen or _orig_size} @ density={args.density or _orig_density}")
+
+        # Test bitdikdə (hətta xəta/sistem çıxışında da) ekranı bərpa et
+        def _reset_screen():
+            try:
+                if _orig_size:
+                    adb_sh(adb, serial, "shell", "wm", "size", "reset")
+                if _orig_density:
+                    adb_sh(adb, serial, "shell", "wm", "density", "reset")
+                log(tag, "   ekran çözünürlüyü bərpa olundu ↩")
+            except Exception:
+                pass
+        atexit.register(_reset_screen)
+    else:
+        size = prof["size"]
+
     print(f"=== {prof['model']} | Android {prof['android']} | {size[0]}x{size[1]} | Brave ===\n")
 
     # --shots verilibse sekiller qalir; verilmeyibse muveqqeti qovluqda isleyib silinir
@@ -523,10 +580,40 @@ def main():
 
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
 
-    url = f"https://www.google.com/search?q={quote_plus(args.query)}"
     log(tag, f"Brave acilir, axtarilir: '{args.query}'")
-    open_url(adb, serial, BRAVE_PKG, url)
-    time.sleep(random.uniform(9, 12))
+    # Open Brave home (not pre-filled search) so we type char-by-char
+    adb_sh(adb, serial, "shell", "am", "start", "-a", "android.intent.action.VIEW",
+           "-d", "https://www.google.com", "-p", BRAVE_PKG, "--activity-clear-top",
+           "--es", "com.android.browser.application_id", BRAVE_PKG)
+    time.sleep(random.uniform(5, 7))
+    # Adres cubuguna toxunub fokusluyuruq, sonra herfi-herf yaziriq.
+    # (Google sehifesinde WebView fokusda qalir, `input text` hecne yaza bilmir.)
+    q = ui_dump(adb, serial)
+    bar = node_center(q, r'resource-id="com\.brave\.browser:id/url_bar"')
+    if bar is None:
+        bar = (471, 177)
+    human_tap(adb, serial, bar[0], bar[1])
+    time.sleep(random.uniform(0.7, 1.1))
+    # Mobildə omnibox-da mövcud ünvan seçilib olur; Ctrl+A ilə təmizləyirik
+    adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_CTRL_A")
+    time.sleep(random.uniform(0.25, 0.45))
+    query = args.query
+    fast = random.random() < 0.5
+    for i, ch in enumerate(query):
+        adb_sh(adb, serial, "shell", "input", "text",
+               "%s" if ch == " " else ch)
+        if random.random() < 0.18:
+            fast = not fast
+        if random.random() < 0.10:
+            d = random.uniform(0.40, 1.15)
+        elif fast:
+            d = random.uniform(0.045, 0.13)
+        else:
+            d = random.uniform(0.14, 0.30)
+        time.sleep(round(d + random.uniform(-0.012, 0.012), 4))
+    # Press Enter
+    adb_sh(adb, serial, "shell", "input", "keyevent", "66")
+    time.sleep(random.uniform(5, 7))
 
     shot = os.path.join(shots, "results.png")
     if not screencap(adb, serial, shot):
@@ -553,6 +640,18 @@ def main():
              "   Bunu avtomatik kecmirik; brauzerin kukilerini temizlemek ve ya gozlemek lazimdir.")
 
     bands = find_link_bands(shot)
+    # Google bazi vaxtlar neticenin ustune boyuk "AI/sayt karti" acir ve asili
+    # neticeler ekranin altina sxrilir -- hecne tapilmir. Asagi surushdurub
+    # yeniden yoxlayiriq.
+    for _ in range(4):
+        if bands:
+            break
+        log(tag, "   netice tapilmadi -- asagi surusdurmek (scroll)...")
+        touch_scroll(adb, serial, size, steps=random.randint(3, 5))
+        time.sleep(random.uniform(1.6, 2.4))
+        if not screencap(adb, serial, shot):
+            break
+        bands = find_link_bands(shot)
     if not bands:
         bail(1, "!! Netice linki tapilmadi.", f"   Unvan setri: {cur}")
 
@@ -588,9 +687,12 @@ def main():
     # Tablar temizlikle eyni anda baglanir (asagida "Tabs" qutusu).
     # Temizlik bas tutmasa tablar da qalir -- ehtiyat ucun ayrica gedis.
     cleared = False
-    if not args.keep_data:
+    if args.only_tabs:
+        log(tag, "   yalnız tablar bağlanacaq...")
+        cleared = close_all_tabs(adb, serial, BRAVE_PKG, tag)
+    elif not args.keep_data:
         cleared = clear_browsing_data(adb, serial, tag, close_tabs=not args.keep_tab)
-    if not args.keep_tab and not cleared:
+    if not args.only_tabs and not args.keep_tab and not cleared:
         close_all_tabs(adb, serial, BRAVE_PKG, tag)
     log(tag, "Bitdi ✅")
 
