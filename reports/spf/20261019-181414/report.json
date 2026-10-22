@@ -1,0 +1,113 @@
+{
+  "url": "https://turanly.com",
+  "device": "M2003J15SC",
+  "udid": "1023061c0409",
+  "when": "20261019-181414",
+  "results": [
+    {
+      "preset": "weak",
+      "wanted": {
+        "cores": 2,
+        "ram": 1,
+        "size": "360x640",
+        "dpr": 2
+      },
+      "seen_by_site": {
+        "cores": 2,
+        "ram": 1,
+        "vp": "360x640",
+        "dpr": 2.0000000596046448,
+        "ua": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Mobile Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-181414/weak.png",
+      "status": "OK"
+    },
+    {
+      "preset": "mid",
+      "wanted": {
+        "cores": 4,
+        "ram": 2,
+        "size": "390x844",
+        "dpr": 3
+      },
+      "seen_by_site": {
+        "cores": 4,
+        "ram": 2,
+        "vp": "390x844",
+        "dpr": 3.000000089406967,
+        "ua": "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Mobile Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-181414/mid.png",
+      "status": "OK"
+    },
+    {
+      "preset": "strong",
+      "wanted": {
+        "cores": 8,
+        "ram": 6,
+        "size": "430x932",
+        "dpr": 3
+      },
+      "seen_by_site": {
+        "cores": 8,
+        "ram": 6,
+        "vp": "430x932",
+        "dpr": 3.000000089406967,
+        "ua": "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Mobile Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-181414/strong.png",
+      "status": "OK"
+    },
+    {
+      "preset": "iphone",
+      "wanted": {
+        "cores": 6,
+        "ram": 4,
+        "size": "390x844",
+        "dpr": 3
+      },
+      "seen_by_site": {
+        "cores": 6,
+        "ram": 4,
+        "vp": "390x844",
+        "dpr": 3.000000089406967,
+        "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/152.0.7977.83 Mobile/15E148 Safari/604.1",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-181414/iphone.png",
+      "status": "OK"
+    },
+    {
+      "preset": "desktop",
+      "wanted": {
+        "cores": 8,
+        "ram": 8,
+        "size": "1440x900",
+        "dpr": 1
+      },
+      "seen_by_site": {
+        "cores": 8,
+        "ram": 8,
+        "vp": "1440x900",
+        "dpr": 1.0000000298023224,
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-181414/desktop.png",
+      "status": "OK"
+    }
+  ]
+}

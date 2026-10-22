@@ -1,0 +1,169 @@
+{
+  "url": "https://turanly.com",
+  "device": "M2003J15SC",
+  "udid": "1023061c0409",
+  "when": "20261019-182812",
+  "results": [
+    {
+      "preset": "galaxy-a05",
+      "device": "Samsung Galaxy A05",
+      "tier": "budget",
+      "wanted": {
+        "cores": 8,
+        "ram": 4,
+        "size": "360x800",
+        "dpr": 2
+      },
+      "seen_by_site": {
+        "cores": 8,
+        "ram": 4,
+        "vp": "360x800",
+        "dpr": 2.0000000596046448,
+        "ua": "Mozilla/5.0 (Linux; Android 14; SM-A055F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Mobile Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-182812/galaxy-a05.png",
+      "status": "OK"
+    },
+    {
+      "preset": "redmi-12c",
+      "device": "Xiaomi Redmi 12C",
+      "tier": "budget",
+      "wanted": {
+        "cores": 8,
+        "ram": 3,
+        "size": "392x873",
+        "dpr": 2.75
+      },
+      "seen_by_site": {
+        "cores": 8,
+        "ram": 3,
+        "vp": "392x873",
+        "dpr": 2.75,
+        "ua": "Mozilla/5.0 (Linux; Android 13; 22101316UG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Mobile Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-182812/redmi-12c.png",
+      "status": "OK"
+    },
+    {
+      "preset": "galaxy-a54",
+      "device": "Samsung Galaxy A54 5G",
+      "tier": "mid",
+      "wanted": {
+        "cores": 8,
+        "ram": 6,
+        "size": "360x780",
+        "dpr": 3
+      },
+      "seen_by_site": {
+        "cores": 8,
+        "ram": 6,
+        "vp": "360x780",
+        "dpr": 3.000000089406967,
+        "ua": "Mozilla/5.0 (Linux; Android 13; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Mobile Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-182812/galaxy-a54.png",
+      "status": "OK"
+    },
+    {
+      "preset": "iphone-se3",
+      "device": "iPhone SE (3rd gen)",
+      "tier": "mid",
+      "wanted": {
+        "cores": 6,
+        "ram": 4,
+        "size": "375x667",
+        "dpr": 2
+      },
+      "seen_by_site": {
+        "cores": 6,
+        "ram": 4,
+        "vp": "375x667",
+        "dpr": 2.0000000596046448,
+        "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Mobile/15E148 Safari/604.1",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-182812/iphone-se3.png",
+      "status": "OK"
+    },
+    {
+      "preset": "pixel-7",
+      "device": "Google Pixel 7",
+      "tier": "flagship",
+      "wanted": {
+        "cores": 8,
+        "ram": 8,
+        "size": "412x915",
+        "dpr": 2.625
+      },
+      "seen_by_site": {
+        "cores": 8,
+        "ram": 8,
+        "vp": "412x915",
+        "dpr": 2.6249999552965164,
+        "ua": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Mobile Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-182812/pixel-7.png",
+      "status": "OK"
+    },
+    {
+      "preset": "iphone-14-pro",
+      "device": "iPhone 14 Pro",
+      "tier": "flagship",
+      "wanted": {
+        "cores": 6,
+        "ram": 6,
+        "size": "393x852",
+        "dpr": 3
+      },
+      "seen_by_site": {
+        "cores": 6,
+        "ram": 6,
+        "vp": "393x852",
+        "dpr": 3.000000089406967,
+        "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-182812/iphone-14-pro.png",
+      "status": "OK"
+    },
+    {
+      "preset": "desktop-win",
+      "device": "Desktop Windows",
+      "tier": "desktop",
+      "wanted": {
+        "cores": 12,
+        "ram": 16,
+        "size": "1440x900",
+        "dpr": 1
+      },
+      "seen_by_site": {
+        "cores": 12,
+        "ram": 16,
+        "vp": "1440x900",
+        "dpr": 1.0000000298023224,
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.83 Safari/537.36",
+        "title": "Turan Hidayətov | Full-Stack Web Developer",
+        "href": "https://turanly.com/az",
+        "mem": 10
+      },
+      "screenshot": "reports/spf/20261019-182812/desktop-win.png",
+      "status": "OK"
+    }
+  ]
+}

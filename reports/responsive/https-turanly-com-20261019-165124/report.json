@@ -1,0 +1,217 @@
+{
+  "url": "https://turanly.com",
+  "device": "M2003J15SC",
+  "udid": "1023061c0409",
+  "when": "20261019-165124",
+  "results": [
+    {
+      "preset": "small_android",
+      "dp": [
+        320,
+        640
+      ],
+      "density": 240,
+      "override_px": [
+        480,
+        960
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/small_android.png",
+      "horizontal_scroll_signal": true,
+      "horizontal_scroll_diff": 0.0303,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "iphone_se",
+      "dp": [
+        375,
+        667
+      ],
+      "density": 320,
+      "override_px": [
+        750,
+        1334
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/iphone_se.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0279,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "iphone_14",
+      "dp": [
+        390,
+        844
+      ],
+      "density": 460,
+      "override_px": [
+        1121,
+        2426
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/iphone_14.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0199,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "iphone_14_pm",
+      "dp": [
+        430,
+        932
+      ],
+      "density": 460,
+      "override_px": [
+        1236,
+        2680
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/iphone_14_pm.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0192,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "galaxy_s21",
+      "dp": [
+        360,
+        800
+      ],
+      "density": 420,
+      "override_px": [
+        945,
+        2100
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/galaxy_s21.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0234,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "pixel_7",
+      "dp": [
+        412,
+        915
+      ],
+      "density": 420,
+      "override_px": [
+        1082,
+        2402
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/pixel_7.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.019,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "redmi_note9",
+      "dp": [
+        393,
+        873
+      ],
+      "density": 440,
+      "override_px": [
+        1080,
+        2340
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/redmi_note9.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0217,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "ipad",
+      "dp": [
+        768,
+        1024
+      ],
+      "density": 160,
+      "override_px": [
+        768,
+        1024
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/ipad.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0117,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "ipad_pro",
+      "dp": [
+        834,
+        1194
+      ],
+      "density": 160,
+      "override_px": [
+        834,
+        1194
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/ipad_pro.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0102,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "desktop_1366",
+      "dp": [
+        1366,
+        768
+      ],
+      "density": 160,
+      "override_px": [
+        1366,
+        768
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/desktop_1366.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0078,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    },
+    {
+      "preset": "desktop_1920",
+      "dp": [
+        1920,
+        1080
+      ],
+      "density": 160,
+      "override_px": [
+        1920,
+        1080
+      ],
+      "loaded": true,
+      "url": "turanly.com/az",
+      "screenshot": "/Users/a1234/phone-project/reports/responsive/https-turanly-com-20261019-165124/desktop_1920.png",
+      "horizontal_scroll_signal": false,
+      "horizontal_scroll_diff": 0.0055,
+      "nodes_outside_viewport": 0,
+      "status": "OK"
+    }
+  ]
+}

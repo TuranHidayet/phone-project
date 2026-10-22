@@ -166,24 +166,23 @@ def find_link_bands(png_path, skip_top_frac=0.28):
 
 def human_tap(adb, serial, x, y):
     """
-    Toxunus -- KICIK TESADUFI SAPMA ile.
-
-    Evvel her defe elementin DEQIQ merkezine, piksel-piksel eyni noqteye
-    toxunulurdu. Real barmaq hec vaxt eyni yere dusmur, Google-un netice
-    sehifesi ise klik koordinatlarini olcur -- eyni noqtenin tekrari
-    "insan deyil" elametidir.
-    Sapma kicik saxlanilir (±7 piksel): bu ekranda bir metn setri ~45-60
-    piksel hundurlukdedir, ona gore hedefden kenara cixmir.
+    İnsan kimi toxunuş.
     """
-    # EYNI SAPMA ARDICIL TEKRARLANMIR. Tesadufi secim bezen eyni deyeri
-    # ust-uste verir; tekrarlanan koordinat ise "alqoritm" kimi gorunur.
-    # Ona gore sonuncu sapma yadda saxlanilir ve tekrarlanarsa yeniden secilir.
+    # sapma kiçik, amma ardıcıl eyni deyil
     while True:
-        dx, dy = random.randint(-7, 7), random.randint(-7, 7)
+        dx, dy = random.randint(-5, 5), random.randint(-5, 5)
         if (dx, dy) != human_tap.last:
             break
     human_tap.last = (dx, dy)
-    adb_sh(adb, serial, "shell", "input", "tap", str(int(x) + dx), str(int(y) + dy))
+    tx, ty = int(x) + dx, int(y) + dy
+    # bəzən əllə toxunmadan əvvəl düşünüb
+    if random.random() < 0.25:
+        time.sleep(random.uniform(0.12, 0.4))
+    # uzunluq dəyişkən
+    dur = random.randint(70, 170)
+    # swipe ilə basma (tap-a nisbətən daha az deterministik)
+    adb_sh(adb, serial, "shell", "input", "swipe", str(tx), str(ty), str(tx), str(ty), str(dur))
+    time.sleep(random.uniform(0.35, 0.9))
 
 
 human_tap.last = (None, None)
@@ -596,24 +595,31 @@ def main():
     time.sleep(random.uniform(0.7, 1.1))
     # Mobildə omnibox-da mövcud ünvan seçilib olur; Ctrl+A ilə təmizləyirik
     adb_sh(adb, serial, "shell", "input", "keyevent", "KEYCODE_CTRL_A")
-    time.sleep(random.uniform(0.25, 0.45))
+    time.sleep(random.uniform(0.4, 0.9))
     query = args.query
-    fast = random.random() < 0.5
+    fast = random.random() < 0.4
     for i, ch in enumerate(query):
         adb_sh(adb, serial, "shell", "input", "text",
                "%s" if ch == " " else ch)
-        if random.random() < 0.18:
-            fast = not fast
-        if random.random() < 0.10:
-            d = random.uniform(0.40, 1.15)
+        # qeyri-bərabər ritm - insan kimi
+        if random.random() < 0.25:
+            fast = random.random() < 0.3  # bəzən düşünər kimi yavaş
+        if random.random() < 0.12:
+            d = random.uniform(0.6, 1.4)  # düşünmə fasiləsi
         elif fast:
-            d = random.uniform(0.045, 0.13)
+            d = random.uniform(0.03, 0.12)
         else:
-            d = random.uniform(0.14, 0.30)
-        time.sleep(round(d + random.uniform(-0.012, 0.012), 4))
+            d = random.uniform(0.15, 0.38)
+        # hərəkətlər arası təsadüfi sapma
+        d += random.uniform(-0.02, 0.05)
+        time.sleep(round(max(0.02, d), 4))
+        if random.random() < 0.08 and i > 2:
+            time.sleep(random.uniform(0.3, 0.8))  # bəzən durma
+    # yazıb bitirdikdən sonra bir az düşün
+    time.sleep(random.uniform(0.8, 1.6))
     # Press Enter
     adb_sh(adb, serial, "shell", "input", "keyevent", "66")
-    time.sleep(random.uniform(5, 7))
+    time.sleep(random.uniform(5.5, 8.5))
 
     shot = os.path.join(shots, "results.png")
     if not screencap(adb, serial, shot):

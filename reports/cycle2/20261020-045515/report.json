@@ -1,0 +1,69 @@
+{
+  "query_flow": [
+    "xeberler",
+    "idman xeberleri",
+    "web developer turanly"
+  ],
+  "device": "M2003J15SC",
+  "udid": "1023061c0409",
+  "rounds": 2,
+  "when": "20261020-045515",
+  "results": [
+    {
+      "round": 1,
+      "preset": "a05-small",
+      "device": "Samsung Galaxy A05",
+      "ok": false,
+      "error": "touch_scroll() got an unexpected keyword argument 'up'"
+    },
+    {
+      "round": 1,
+      "preset": "se-compact",
+      "device": "iPhone SE 3 (kiçik)",
+      "ok": false,
+      "error": "touch_scroll() got an unexpected keyword argument 'up'"
+    },
+    {
+      "round": 1,
+      "preset": "pixel-7",
+      "device": "Google Pixel 7",
+      "ok": false,
+      "error": "touch_scroll() got an unexpected keyword argument 'up'"
+    },
+    {
+      "round": 1,
+      "preset": "native",
+      "device": "Redmi Note 9 (real)",
+      "ok": false,
+      "error": "touch_scroll() got an unexpected keyword argument 'up'"
+    },
+    {
+      "round": 2,
+      "preset": "a05-small",
+      "device": "Samsung Galaxy A05",
+      "ok": false,
+      "error": "touch_scroll() got an unexpected keyword argument 'up'"
+    },
+    {
+      "round": 2,
+      "preset": "se-compact",
+      "device": "iPhone SE 3 (kiçik)",
+      "ok": false,
+      "error": "touch_scroll() got an unexpected keyword argument 'up'"
+    },
+    {
+      "round": 2,
+      "preset": "pixel-7",
+      "device": "Google Pixel 7",
+      "ok": false,
+      "error": "touch_scroll() got an unexpected keyword argument 'up'"
+    },
+    {
+      "round": 2,
+      "preset": "native",
+      "device": "Redmi Note 9 (real)",
+      "ok": false,
+      "error": "touch_scroll() got an unexpected keyword argument 'up'"
+    }
+  ]
+}

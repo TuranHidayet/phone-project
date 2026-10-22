@@ -1,0 +1,73 @@
+{
+  "url": "google-search",
+  "query": "turanly",
+  "device": "M2003J15SC",
+  "udid": "1023061c0409",
+  "orig_screen": {
+    "size": "1080x2340",
+    "density": 440
+  },
+  "when": "20261020-042117",
+  "results": [
+    {
+      "preset": "a05-small",
+      "device": "Samsung Galaxy A05",
+      "tier": "budget",
+      "wm_size": "720x1600",
+      "wm_density": 320,
+      "status": "OK",
+      "ok": true,
+      "duration_s": 97.6
+    },
+    {
+      "preset": "redmi-c",
+      "device": "Xiaomi Redmi 12C",
+      "tier": "budget",
+      "wm_size": "720x1600",
+      "wm_density": 264,
+      "status": "OK",
+      "ok": true,
+      "duration_s": 89.8
+    },
+    {
+      "preset": "se-compact",
+      "device": "iPhone SE 3 (kiçik)",
+      "tier": "mid",
+      "wm_size": "750x1334",
+      "wm_density": 326,
+      "status": "OK",
+      "ok": true,
+      "duration_s": 89.5
+    },
+    {
+      "preset": "a54-mid",
+      "device": "Samsung Galaxy A54",
+      "tier": "mid",
+      "wm_size": "1080x2340",
+      "wm_density": 420,
+      "status": "OK",
+      "ok": true,
+      "duration_s": 101.0
+    },
+    {
+      "preset": "pixel-7",
+      "device": "Google Pixel 7",
+      "tier": "flagship",
+      "wm_size": "1080x2400",
+      "wm_density": 420,
+      "status": "OK",
+      "ok": true,
+      "duration_s": 112.3
+    },
+    {
+      "preset": "native",
+      "device": "Redmi Note 9 (real)",
+      "tier": "native",
+      "wm_size": "1080x2340",
+      "wm_density": 440,
+      "status": "OK",
+      "ok": true,
+      "duration_s": 98.7
+    }
+  ]
+}

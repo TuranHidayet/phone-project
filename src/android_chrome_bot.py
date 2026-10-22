@@ -246,19 +246,33 @@ def touch_scroll(adb, serial, size, steps=None):
     w, h = size
     steps = steps if steps is not None else random.randint(SCROLL_STEPS_MIN, SCROLL_STEPS_MAX)
     for _ in range(steps):
-        x = int(w * random.uniform(0.40, 0.60))
-        y1 = int(h * random.uniform(0.70, 0.80))
-        y2 = int(h * random.uniform(0.25, 0.40))
+        # barmaq nöqtəsi hər dəfə dəyişsın
+        x = int(w * random.uniform(0.38, 0.62))
+        y1 = int(h * random.uniform(0.65, 0.85))
+        y2 = int(h * random.uniform(0.18, 0.38))
+        dur = random.randint(250, 650)
         adb_sh(adb, serial, "shell", "input", "swipe",
-               str(x), str(y1), str(x), str(y2), str(random.randint(220, 550)))
-        time.sleep(random.uniform(0.6, 2.0))
-    if random.random() < 0.5:
-        for _ in range(random.randint(1, 3)):
-            x = int(w * random.uniform(0.40, 0.60))
+               str(x), str(y1), str(x), str(y2), str(dur))
+        # qeyri-bərabər dayanmalar
+        if random.random() < 0.4:
+            time.sleep(random.uniform(0.8, 2.2))
+        else:
+            time.sleep(random.uniform(0.5, 1.6))
+    if random.random() < 0.6:
+        for _ in range(random.randint(1, 4)):
+            x = int(w * random.uniform(0.35, 0.65))
+            y1 = int(h * random.uniform(0.4, 0.6))
+            y2 = int(h * random.uniform(0.25, 0.45))
             adb_sh(adb, serial, "shell", "input", "swipe",
-                   str(x), str(int(h * 0.35)), str(x), str(int(h * 0.65)),
-                   str(random.randint(280, 600)))
-            time.sleep(random.uniform(0.4, 1.0))
+                   str(x), str(y1), str(x), str(y2), str(random.randint(320, 700)))
+            time.sleep(random.uniform(0.4, 1.2))
+    # bəzən yuxarı çək (insan səhifədə geri baxır)
+    if random.random() < 0.25:
+        x = int(w * random.uniform(0.4, 0.6))
+        adb_sh(adb, serial, "shell", "input", "swipe",
+               str(x), str(int(h * 0.3)), str(x), str(int(h * 0.7)),
+               str(random.randint(380, 650)))
+        time.sleep(random.uniform(0.6, 1.4))
 
 
 def js_scroll(driver, steps=None):
